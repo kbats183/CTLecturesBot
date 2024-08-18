@@ -6,18 +6,18 @@ import com.github.kotlintelegrambot.dispatcher.handlers.CallbackQueryHandlerEnvi
 import com.github.kotlintelegrambot.dispatcher.handlers.TextHandlerEnvironment
 import com.github.kotlintelegrambot.dispatcher.text
 import kotlinx.coroutines.runBlocking
-import ru.kbats.youtube.broadcastscheduler.Repository
+import ru.kbats.youtube.broadcastscheduler.Application
 import java.lang.Integer.min
 
 typealias HandleTextSuspend = suspend TextHandlerEnvironment.() -> Unit
 typealias HandleCallbackQuery = suspend CallbackQueryHandlerEnvironment.() -> Unit
 
 
-class AdminDispatcher(private val repository: Repository, private val dispatcher: Dispatcher) {
+class AdminDispatcher(val application: Application, private val dispatcher: Dispatcher) {
     fun text(text: String? = null, handleText: HandleTextSuspend) {
         dispatcher.text(text) {
             runBlocking {
-                if (repository.getAdmins().any { it.login == message.from?.username }) {
+                if (application.repository.getAdmins().any { it.login == message.from?.username }) {
                     println("User ${message.chat.username} send text `${message.text}`")
                     handleText()
                 }
@@ -28,7 +28,7 @@ class AdminDispatcher(private val repository: Repository, private val dispatcher
     fun callbackQuery(data: String? = null, handleCallbackQuery: HandleCallbackQuery) {
         dispatcher.callbackQuery(data) {
             runBlocking {
-                if (repository.getAdmins().any { it.login == callbackQuery.from.username }) {
+                if (application.repository.getAdmins().any { it.login == callbackQuery.from.username }) {
                     println(
                         "User ${callbackQuery.from.username} send callback ${callbackQuery.data} from message " +
                                 "`${callbackQuery.message?.text?.let { it.substring(0, min(50, it.length)) }}`"
@@ -40,6 +40,6 @@ class AdminDispatcher(private val repository: Repository, private val dispatcher
     }
 }
 
-fun Dispatcher.withAdminRight(repository: Repository, body: AdminDispatcher.() -> Unit) {
-    AdminDispatcher(repository, this).body()
+fun Dispatcher.withAdminRight(application: Application, body: AdminDispatcher.() -> Unit) {
+    AdminDispatcher(application, this).body()
 }
