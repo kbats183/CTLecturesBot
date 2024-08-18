@@ -1,10 +1,9 @@
 package ru.kbats.youtube.broadcastscheduler.data
 
 import org.bson.codecs.pojo.annotations.BsonId
-import org.litote.kmongo.Id
-import org.litote.kmongo.newId
+import org.bson.types.ObjectId
 
-data class Admin(@BsonId val id: Id<Admin> = newId(), val login: String, val comment: String)
+data class Admin(@BsonId val id: ObjectId = ObjectId(), val login: String, val comment: String)
 
 data class LectureThumbnails(
     val fileName: String,
@@ -30,6 +29,7 @@ enum class LectureType {
 }
 
 data class Lecture(
+    @BsonId val id: ObjectId = ObjectId(),
     val name: String,
     val title: String,
     val description: String,
@@ -40,5 +40,4 @@ data class Lecture(
     val thumbnails: LectureThumbnails? = null,
     val scheduling: LectureBroadcastScheduling? = null,
     val privacy: LectureBroadcastPrivacy,
-    @BsonId val id: Id<Lecture> = newId(),
 )

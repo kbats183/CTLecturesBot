@@ -28,9 +28,6 @@ class Application(private val config: Config) {
             token = config.botApiToken
             dispatch {
                 message {
-                    message.document?.let {
-                        bot.downloadFile(it.fileId).first
-                    }
                     println("${message.document}")
                 }
                 setupDispatcher(this)
