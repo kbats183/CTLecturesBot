@@ -5,7 +5,7 @@ import ru.kbats.youtube.broadcastscheduler.bot.AdminDispatcher
 import ru.kbats.youtube.broadcastscheduler.bot.InlineButtons
 import ru.kbats.youtube.broadcastscheduler.bot.callbackQueryId
 import ru.kbats.youtube.broadcastscheduler.bot.infoMessage
-import ru.kbats.youtube.broadcastscheduler.states.BotUserState
+import ru.kbats.youtube.broadcastscheduler.states.UserState
 
 fun AdminDispatcher.setupLiveStreamsDispatcher() {
     val youtubeApi = application.youtubeApi
@@ -19,7 +19,7 @@ fun AdminDispatcher.setupLiveStreamsDispatcher() {
     }
     callbackQuery("LiveStreamsNewCmd") {
         bot.sendMessage(ChatId.fromId(callbackQuery.from.id), text = "Enter name of new stream")
-        application.userStates[callbackQuery.from.id] = BotUserState.CreatingNewLiveStream
+        application.userStates[callbackQuery.from.id] = UserState.CreatingNewLiveStream
     }
     callbackQuery("LiveStreamsListCmd") {
         val liveStreams = youtubeApi.getStreams().sortedBy { it.snippet.title }

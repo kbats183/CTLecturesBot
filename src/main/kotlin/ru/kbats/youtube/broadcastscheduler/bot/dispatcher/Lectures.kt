@@ -6,7 +6,7 @@ import com.github.kotlintelegrambot.entities.TelegramFile
 import ru.kbats.youtube.broadcastscheduler.Application
 import ru.kbats.youtube.broadcastscheduler.bot.*
 import ru.kbats.youtube.broadcastscheduler.data.Lecture
-import ru.kbats.youtube.broadcastscheduler.states.BotUserState
+import ru.kbats.youtube.broadcastscheduler.states.UserState
 import ru.kbats.youtube.broadcastscheduler.thumbnail.Thumbnail
 import kotlin.io.path.Path
 
@@ -109,7 +109,7 @@ fun AdminDispatcher.setupLecturesDispatcher() {
     callbackQuery("LecturesItemApplyTemplateCmd") {
         val id = callbackQueryId("LecturesItemApplyTemplateCmd") ?: return@callbackQuery
         repository.getLecture(id) ?: return@callbackQuery
-        application.userStates[callbackQuery.from.id] = BotUserState.ApplyingTemplateToVideo(id)
+        application.userStates[callbackQuery.from.id] = UserState.ApplyingTemplateToVideo(id)
         bot.sendMessage(
             ChatId.fromId(callbackQuery.from.id),
             text = "Send video id or url to apply lecture template or click /cancel"

@@ -1,10 +1,10 @@
 package ru.kbats.youtube.broadcastscheduler.states
 
 class UserStateStorage {
-    private val states = mutableMapOf<Long, BotUserState>()
+    private val states = mutableMapOf<Long, UserState>()
 
-    operator fun get(id: Long?) = id?.let { states[it] } ?: BotUserState.Default
-    operator fun set(id: Long, newState: BotUserState) {
+    operator fun get(id: Long?) = id?.let { states[it] } ?: UserState.Default
+    operator fun set(id: Long, newState: UserState) {
         states[id] = newState
     }
 }

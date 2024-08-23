@@ -4,10 +4,8 @@ import com.github.kotlintelegrambot.dispatcher.Dispatcher
 import com.github.kotlintelegrambot.entities.ChatId
 import ru.kbats.youtube.broadcastscheduler.Application
 import ru.kbats.youtube.broadcastscheduler.YoutubeVideoIDMatcher
-import ru.kbats.youtube.broadcastscheduler.bot.dispatcher.setupBroadcastDispatcher
-import ru.kbats.youtube.broadcastscheduler.bot.dispatcher.setupLecturesDispatcher
-import ru.kbats.youtube.broadcastscheduler.bot.dispatcher.setupLiveStreamsDispatcher
-import ru.kbats.youtube.broadcastscheduler.states.BotUserState
+import ru.kbats.youtube.broadcastscheduler.bot.dispatcher.*
+import ru.kbats.youtube.broadcastscheduler.states.UserState
 
 fun Application.setupDispatcher(dispatcher: Dispatcher) {
     dispatcher.withAdminRight(this) {
@@ -24,17 +22,17 @@ fun Application.setupDispatcher(dispatcher: Dispatcher) {
                 return@text
             }
             if ("/cancel" in text) {
-                userStates[message.chat.id] = BotUserState.Default
+                userStates[message.chat.id] = UserState.Default
                 return@text
             }
             when (val state = userStates[message.chat.id]) {
-                is BotUserState.CreatingNewLiveStream -> {
+                is UserState.CreatingNewLiveStream -> {
                     val newLiveStream = youtubeApi.createStream(text)
                     bot.sendMessage(chatId, newLiveStream.infoMessage())
-                    userStates[message.chat.id] = BotUserState.Default
+                    userStates[message.chat.id] = UserState.Default
                 }
 
-                is BotUserState.ApplyingTemplateToVideo -> {
+                is UserState.ApplyingTemplateToVideo -> {
                     val videoId = YoutubeVideoIDMatcher.match(text) ?: return@text Unit.also {
                         bot.sendMessage(chatId, text = "Invalid video id or url")
                     }
@@ -54,17 +52,21 @@ fun Application.setupDispatcher(dispatcher: Dispatcher) {
                         return@text
                     }
                     bot.sendMessage(chatId, text = video.infoMessage())
-                    userStates[message.chat.id] = BotUserState.Default
+                    userStates[message.chat.id] = UserState.Default
                 }
 
-                else -> {
-                    bot.sendMessage(
-                        chatId, text = "Main menu",
-                        replyMarkup = InlineButtons.mainMenu,
-                    )
-                }
+                else -> {}
             }
         }
+
+        command("start") {
+            bot.sendMessage(
+                ChatId.fromId(message.chat.id), text = "Main menu",
+                replyMarkup = InlineButtons.mainMenu,
+            )
+
+        }
+
         callbackQuery("HideCallbackMessageCmd") {
             bot.deleteMessage(
                 chatId = callbackQuery.message?.chat?.id?.let { ChatId.fromId(it) } ?: return@callbackQuery,
@@ -75,6 +77,10 @@ fun Application.setupDispatcher(dispatcher: Dispatcher) {
         setupLiveStreamsDispatcher()
         setupBroadcastDispatcher()
         setupLecturesDispatcher()
+
+        setupThumbnailsImagesDispatcher()
+        setupThumbnailsTemplatesDispatcher()
+
     }
 }
 

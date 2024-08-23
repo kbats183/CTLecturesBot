@@ -2,15 +2,21 @@ package ru.kbats.youtube.broadcastscheduler.bot
 
 import com.github.kotlintelegrambot.Bot
 import com.github.kotlintelegrambot.dispatcher.handlers.CallbackQueryHandlerEnvironment
+import com.github.kotlintelegrambot.dispatcher.handlers.HandleInlineQuery
+import com.github.kotlintelegrambot.dispatcher.handlers.InlineQueryHandlerEnvironment
 import com.github.kotlintelegrambot.entities.ChatId
 import com.github.kotlintelegrambot.entities.InlineKeyboardMarkup
+import com.github.kotlintelegrambot.entities.InlineQuery
 import com.github.kotlintelegrambot.entities.Message
+import com.github.kotlintelegrambot.entities.inlinequeryresults.InlineQueryResult
+import com.github.kotlintelegrambot.entities.inlinequeryresults.InputMessageContent
 import com.github.kotlintelegrambot.entities.keyboard.InlineKeyboardButton
 import com.google.api.services.youtube.model.LiveBroadcast
 import com.google.api.services.youtube.model.LiveBroadcastStatus
 import com.google.api.services.youtube.model.LiveStream
 import com.google.api.services.youtube.model.Video
 import ru.kbats.youtube.broadcastscheduler.data.Lecture
+import ru.kbats.youtube.broadcastscheduler.data.ThumbnailsTemplate
 import ru.kbats.youtube.broadcastscheduler.withUpdateUrlSuffix
 
 internal fun CallbackQueryHandlerEnvironment.callbackQueryId(commandPrefix: String): String? {
@@ -56,8 +62,17 @@ internal fun LiveBroadcastStatus.emojy(): String = when (this.lifeCycleStatus) {
     else -> "[" + this.lifeCycleStatus + "]"
 } + " "
 
+val addThumbnailsImageInlineResult = InlineQueryResult.Article(
+    id = "__add",
+    title = "Add new Thumbnails Image",
+    description = "",
+    inputMessageContent = InputMessageContent.Text("To add new thumbnails image click button and than send short name of thumbnails image, for example Скаков П. С."),
+    replyMarkup = InlineButtons.thumbnailsImagesNewMenu,
+)
+
 object InlineButtons {
     val mainMenu = InlineKeyboardMarkup.createSingleRowKeyboard(
+        InlineKeyboardButton.CallbackData("Thumbnails", "ThumbnailsTemplatesCmd"),
         InlineKeyboardButton.CallbackData("Streams", "LiveStreamsCmd"),
         InlineKeyboardButton.CallbackData("Broadcasts", "BroadcastsCmd"),
         InlineKeyboardButton.CallbackData("Lectures", "LecturesCmd"),
@@ -225,4 +240,105 @@ object InlineButtons {
         }
         return InlineKeyboardMarkup.create(buttons)
     }
+
+    val thumbnailsImagesMenu = InlineKeyboardMarkup.createSingleRowKeyboard(
+        InlineKeyboardButton.CallbackData("New", "ThumbnailsImagesNewCmd"),
+        InlineKeyboardButton.SwitchInlineQueryCurrentChat("List", "ThumbnailsImages")
+    )
+
+    val thumbnailsImagesNewMenu = InlineKeyboardMarkup.createSingleRowKeyboard(
+        InlineKeyboardButton.CallbackData("New", "ThumbnailsImagesNewCmd")
+    )
+
+    val thumbnailsTemplatesMenu = InlineKeyboardMarkup.createSingleRowKeyboard(
+        InlineKeyboardButton.CallbackData("New", "ThumbnailsTemplatesNewCmd"),
+        InlineKeyboardButton.SwitchInlineQueryCurrentChat("List", "ThumbnailsTemplates"),
+        InlineKeyboardButton.CallbackData("Images", "ThumbnailsImagesCmd"),
+    )
+
+    fun thumbnailsTemplateManage(template: ThumbnailsTemplate): InlineKeyboardMarkup {
+        fun editProperty(name: String, title: String): InlineKeyboardButton.CallbackData {
+            return InlineKeyboardButton.CallbackData(
+                "Изменить $title",
+                "ThumbnailsTemplatesItemEdit${name}Cmd${template.id}"
+            )
+        }
+
+        return InlineKeyboardMarkup.create(
+            listOf(
+                editProperty("Name", "название"),
+                editProperty("Title", "заголовок"),
+            ), listOf(
+                editProperty("Lecturer", "лектора"),
+                editProperty("Term", "семестр")
+            ), listOf(
+                editProperty("Color", "цвет"),
+                editProperty("Image", "картинку"),
+            )
+        )
+    }
+
+    val thumbnailsTemplateEditImage = InlineKeyboardMarkup.createSingleButton(
+        InlineKeyboardButton.SwitchInlineQueryCurrentChat(
+            "Выбрать",
+            "ThumbnailsImages"
+        )
+    )
 }
+
+val String.escapeMarkdown
+    get() = this
+        .replace("_", "\\_")
+        .replace("*", "\\*")
+        .replace("[", "\\[")
+        .replace("]", "\\]")
+        .replace("(", "\\(")
+        .replace(")", "\\)")
+        .replace("~", "\\~")
+        .replace("`", "\\`")
+        .replace(">", "\\>")
+        .replace("#", "\\#")
+        .replace("+", "\\+")
+        .replace("-", "\\-")
+        .replace("=", "\\=")
+        .replace("|", "\\|")
+        .replace("{", "\\{")
+        .replace("}", "\\}")
+        .replace(".", "\\.")
+        .replace("!", "\\!")
+
+val colorsTgExample = "\uD83D\uDD34 \\- `tart`\n" +
+        "\uD83D\uDFE0 \\- `honey`\n" +
+        "\uD83D\uDFE1 \\- `yellow`\n" +
+        "\uD83D\uDFE2 \\- `green`\n" +
+        "\uD83C\uDF10 \\- `capri`\n" +
+        "\uD83D\uDD35 \\- `bluetiful`\n" +
+        "\uD83D\uDFE3 \\- `violet`\n" +
+        "\uD83D\uDC5A \\- `pink` или другой rgb \\#012345"
+
+suspend fun InlineQueryHandlerEnvironment.renderInlineListItems(
+    inlinePrefix: String,
+    addItems: List<InlineQueryResult> = emptyList(),
+    itemsSupplier: suspend () -> List<InlineQueryResult>
+) {
+    if (inlineQuery.query.startsWith(inlinePrefix) && inlineQuery.chatType == InlineQuery.ChatType.SENDER) {
+        if (inlineQuery.offset == "end") {
+            return
+        }
+
+        val thumbs = itemsSupplier()
+            .dropWhile { inlineQuery.offset != "" && inlineQuery.offset != it.id }
+            .take(50)
+
+        val stuffResult = addItems.filter { inlineQuery.offset == "" }
+
+        bot.answerInlineQuery(
+            inlineQueryId = inlineQuery.id,
+            inlineQueryResults = stuffResult + thumbs.take(50 - stuffResult.size),
+            nextOffset = thumbs.getOrNull(50 - stuffResult.size)?.id ?: "end"
+        )
+    }
+}
+
+val thumbnailsTemplateIdRegexp = "thumbnails\\_template\\_([0-9a-f]+)".toRegex()
+val thumbnailsImageIdRegexp = "thumbnails\\_image\\_([0-9a-f]+)".toRegex()

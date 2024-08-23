@@ -5,6 +5,33 @@ import org.bson.types.ObjectId
 
 data class Admin(@BsonId val id: ObjectId = ObjectId(), val login: String, val comment: String)
 
+data class ThumbnailsImage(
+    @BsonId val id: ObjectId = ObjectId(),
+    val name: String,
+)
+
+data class ThumbnailsTemplate(
+    @BsonId val id: ObjectId = ObjectId(),
+    val name: String,
+    val firstTitle: String,
+    val secondTitle: String,
+    val lecturerName: String,
+    val termNumber: String,
+    val color: String,
+    val imageId: ObjectId? = null
+)
+
+data class Lesson(
+    @BsonId val id: ObjectId = ObjectId(),
+    val name: String,
+    val formalName: String,
+    val lecturerName: String,
+    val termNumber: String,
+// TODO: playlists
+    val mainTemplate: ThumbnailsTemplate?,
+    //type of numeration
+)
+
 data class LectureThumbnails(
     val fileName: String,
     val textColor: String,

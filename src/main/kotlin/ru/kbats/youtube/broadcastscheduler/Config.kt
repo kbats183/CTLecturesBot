@@ -4,6 +4,7 @@ data class Config(
     val botApiToken: String,
     val mongoDBConnectionString: String,
     val mongoDBBase: String,
+    val publicFilesUrl: String = "https://kbats.ru/ctlecbot"
 )
 
 fun config(): Config {
