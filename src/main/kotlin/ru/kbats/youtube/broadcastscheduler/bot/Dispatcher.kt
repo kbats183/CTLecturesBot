@@ -80,7 +80,7 @@ fun Application.setupDispatcher(dispatcher: Dispatcher) {
 
         setupThumbnailsImagesDispatcher()
         setupThumbnailsTemplatesDispatcher()
-
+        setupLessonsDispatcher()
     }
 }
 

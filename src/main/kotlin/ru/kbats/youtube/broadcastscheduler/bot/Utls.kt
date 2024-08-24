@@ -2,21 +2,22 @@ package ru.kbats.youtube.broadcastscheduler.bot
 
 import com.github.kotlintelegrambot.Bot
 import com.github.kotlintelegrambot.dispatcher.handlers.CallbackQueryHandlerEnvironment
-import com.github.kotlintelegrambot.dispatcher.handlers.HandleInlineQuery
 import com.github.kotlintelegrambot.dispatcher.handlers.InlineQueryHandlerEnvironment
 import com.github.kotlintelegrambot.entities.ChatId
 import com.github.kotlintelegrambot.entities.InlineKeyboardMarkup
 import com.github.kotlintelegrambot.entities.InlineQuery
 import com.github.kotlintelegrambot.entities.Message
 import com.github.kotlintelegrambot.entities.inlinequeryresults.InlineQueryResult
-import com.github.kotlintelegrambot.entities.inlinequeryresults.InputMessageContent
 import com.github.kotlintelegrambot.entities.keyboard.InlineKeyboardButton
 import com.google.api.services.youtube.model.LiveBroadcast
 import com.google.api.services.youtube.model.LiveBroadcastStatus
 import com.google.api.services.youtube.model.LiveStream
 import com.google.api.services.youtube.model.Video
 import ru.kbats.youtube.broadcastscheduler.data.Lecture
+import ru.kbats.youtube.broadcastscheduler.data.Lesson
+import ru.kbats.youtube.broadcastscheduler.data.ThumbnailsImage
 import ru.kbats.youtube.broadcastscheduler.data.ThumbnailsTemplate
+import ru.kbats.youtube.broadcastscheduler.states.UserState
 import ru.kbats.youtube.broadcastscheduler.withUpdateUrlSuffix
 
 internal fun CallbackQueryHandlerEnvironment.callbackQueryId(commandPrefix: String): String? {
@@ -62,17 +63,10 @@ internal fun LiveBroadcastStatus.emojy(): String = when (this.lifeCycleStatus) {
     else -> "[" + this.lifeCycleStatus + "]"
 } + " "
 
-val addThumbnailsImageInlineResult = InlineQueryResult.Article(
-    id = "__add",
-    title = "Add new Thumbnails Image",
-    description = "",
-    inputMessageContent = InputMessageContent.Text("To add new thumbnails image click button and than send short name of thumbnails image, for example Скаков П. С."),
-    replyMarkup = InlineButtons.thumbnailsImagesNewMenu,
-)
-
 object InlineButtons {
     val mainMenu = InlineKeyboardMarkup.createSingleRowKeyboard(
         InlineKeyboardButton.CallbackData("Thumbnails", "ThumbnailsTemplatesCmd"),
+        InlineKeyboardButton.CallbackData("Lessons", "LessonsCmd"),
         InlineKeyboardButton.CallbackData("Streams", "LiveStreamsCmd"),
         InlineKeyboardButton.CallbackData("Broadcasts", "BroadcastsCmd"),
         InlineKeyboardButton.CallbackData("Lectures", "LecturesCmd"),
@@ -250,13 +244,21 @@ object InlineButtons {
         InlineKeyboardButton.CallbackData("New", "ThumbnailsImagesNewCmd")
     )
 
+    fun thumbnailsImagesManage(image: ThumbnailsImage, state: UserState) =
+        InlineKeyboardMarkup.create(
+            listOfNotNull(InlineKeyboardButton.CallbackData(
+                "Назад ⬅\uFE0F",
+                "ThumbnailsImageItemBackCmd${image.id}"
+            ).takeIf { state != UserState.Default }),
+        )
+
     val thumbnailsTemplatesMenu = InlineKeyboardMarkup.createSingleRowKeyboard(
         InlineKeyboardButton.CallbackData("New", "ThumbnailsTemplatesNewCmd"),
         InlineKeyboardButton.SwitchInlineQueryCurrentChat("List", "ThumbnailsTemplates"),
         InlineKeyboardButton.CallbackData("Images", "ThumbnailsImagesCmd"),
     )
 
-    fun thumbnailsTemplateManage(template: ThumbnailsTemplate): InlineKeyboardMarkup {
+    fun thumbnailsTemplateManage(template: ThumbnailsTemplate, state: UserState): InlineKeyboardMarkup {
         fun editProperty(name: String, title: String): InlineKeyboardButton.CallbackData {
             return InlineKeyboardButton.CallbackData(
                 "Изменить $title",
@@ -265,6 +267,10 @@ object InlineButtons {
         }
 
         return InlineKeyboardMarkup.create(
+            listOfNotNull(InlineKeyboardButton.CallbackData(
+                "Назад ⬅\uFE0F",
+                "ThumbnailsTemplatesItemBackCmd"
+            ).takeIf { state != UserState.Default }),
             listOf(
                 editProperty("Name", "название"),
                 editProperty("Title", "заголовок"),
@@ -282,6 +288,61 @@ object InlineButtons {
         InlineKeyboardButton.SwitchInlineQueryCurrentChat(
             "Выбрать",
             "ThumbnailsImages"
+        )
+    )
+
+    val lessonsMenu = InlineKeyboardMarkup.createSingleRowKeyboard(
+        InlineKeyboardButton.CallbackData("Добавить", "LessonsNewCmd"),
+        InlineKeyboardButton.SwitchInlineQueryCurrentChat("Список", "Lessons")
+    )
+
+    fun lessonManage(lesson: Lesson): InlineKeyboardMarkup {
+        fun b(name: String, title: String) = InlineKeyboardButton.CallbackData(title, "Lesson${name}Cmd${lesson.id}")
+
+        return InlineKeyboardMarkup.create(
+            listOfNotNull(
+                b("AddVideo", "Добавить видео").takeIf { lesson.mainTemplateId != null },
+                b("SettingsEditThumbnailsTemplate", "Выбрать шаблон превью").takeIf { lesson.mainTemplateId == null },
+                b("ListVideos", "Видео"),
+            ), listOf(
+                b("ChangeNumberInc", "Номер + 1"),
+                b("ChangeNumberDec", "Номер - 1"),
+            ), listOf(
+                b("SettingsMenu", "Настройки"),
+//                editProperty("Delete", "Удалить"),
+            )
+        )
+    }
+
+    fun lessonSettings(lesson: Lesson): InlineKeyboardMarkup {
+        fun b(name: String, title: String) =
+            InlineKeyboardButton.CallbackData(title, "LessonSettings${name}Cmd${lesson.id}")
+
+        return InlineKeyboardMarkup.create(
+            listOfNotNull(
+                b("Back", "Назад")
+            ), listOf(
+                b("EditName", "Изменить название"),
+                b("EditTitle", "Изменить заголовок видео"),
+            ), listOf(
+                b("EditLecturer", "Изменить лектора"),
+                b("EditTermNumber", "Изменить номер семестра"),
+            ), listOf(
+                b("EditThumbnailsTemplate", "Изменить шаблон превью"),
+            )
+        )
+    }
+
+
+    fun lessonsEditThumbnailsMenu(lesson: Lesson) = InlineKeyboardMarkup.create(
+        listOfNotNull(
+            InlineKeyboardButton.CallbackData("Создать новый для предмета", "LessonsEditThumbnailsTemplateNewCmd"),
+            InlineKeyboardButton.SwitchInlineQueryCurrentChat("Выбрать существующий", "ThumbnailsTemplates"),
+        ),
+        listOfNotNull(
+            InlineKeyboardButton.CallbackData("Изменить текущий", "LessonsEditThumbnailsTemplateEditCmd")
+                .takeIf { lesson.mainTemplateId != null },
+            InlineKeyboardButton.CallbackData("Отмена", "LessonsSettingsEditThumbnailsTemplateCancelCmd")
         )
     )
 }
@@ -307,7 +368,8 @@ val String.escapeMarkdown
         .replace(".", "\\.")
         .replace("!", "\\!")
 
-val colorsTgExample = "\uD83D\uDD34 \\- `tart`\n" +
+val itmoColors = arrayListOf("tart", "honey", "yellow", "green", "capri", "bluetiful", "violet", "pink")
+val itmoColorsTgExample = "\uD83D\uDD34 \\- `tart`\n" +
         "\uD83D\uDFE0 \\- `honey`\n" +
         "\uD83D\uDFE1 \\- `yellow`\n" +
         "\uD83D\uDFE2 \\- `green`\n" +
@@ -326,7 +388,7 @@ suspend fun InlineQueryHandlerEnvironment.renderInlineListItems(
             return
         }
 
-        val thumbs = itemsSupplier()
+        val items = itemsSupplier()
             .dropWhile { inlineQuery.offset != "" && inlineQuery.offset != it.id }
             .take(50)
 
@@ -334,11 +396,12 @@ suspend fun InlineQueryHandlerEnvironment.renderInlineListItems(
 
         bot.answerInlineQuery(
             inlineQueryId = inlineQuery.id,
-            inlineQueryResults = stuffResult + thumbs.take(50 - stuffResult.size),
-            nextOffset = thumbs.getOrNull(50 - stuffResult.size)?.id ?: "end"
+            inlineQueryResults = stuffResult + items.take(50 - stuffResult.size),
+            nextOffset = items.getOrNull(50 - stuffResult.size)?.id ?: "end"
         )
     }
 }
 
 val thumbnailsTemplateIdRegexp = "thumbnails\\_template\\_([0-9a-f]+)".toRegex()
 val thumbnailsImageIdRegexp = "thumbnails\\_image\\_([0-9a-f]+)".toRegex()
+val lessonIdRegexp = "lesson\\_([0-9a-f]+)".toRegex()

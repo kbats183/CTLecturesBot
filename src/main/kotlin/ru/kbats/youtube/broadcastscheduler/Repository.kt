@@ -6,16 +6,14 @@ import com.mongodb.kotlin.client.coroutine.MongoDatabase
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.toList
 import org.bson.types.ObjectId
-import ru.kbats.youtube.broadcastscheduler.data.Admin
-import ru.kbats.youtube.broadcastscheduler.data.Lecture
-import ru.kbats.youtube.broadcastscheduler.data.ThumbnailsImage
-import ru.kbats.youtube.broadcastscheduler.data.ThumbnailsTemplate
+import ru.kbats.youtube.broadcastscheduler.data.*
 
 class Repository(db: MongoDatabase) {
     val admin = db.getCollection<Admin>("admin")
     val lecture = db.getCollection<Lecture>("lecture")
-    val thumbnailsImage = db.getCollection<ThumbnailsImage>("thumbnailsImage")
-    val thumbnailsTemplate = db.getCollection<ThumbnailsTemplate>("thumbnailsTemplate")
+    private val thumbnailsImage = db.getCollection<ThumbnailsImage>("thumbnailsImage")
+    private val thumbnailsTemplate = db.getCollection<ThumbnailsTemplate>("thumbnailsTemplate")
+    private val lesson = db.getCollection<Lesson>("lesson")
 
     suspend fun getAdmins(): List<Admin> {
         return admin.find().toList()
@@ -42,7 +40,7 @@ class Repository(db: MongoDatabase) {
         return thumbnailsImage.find().toList().sortedBy { it.name }
     }
 
-    suspend fun getThumbnailsImages(id: String): ThumbnailsImage? {
+    suspend fun getThumbnailsImage(id: String): ThumbnailsImage? {
         return thumbnailsImage.find(eq("_id", ObjectId(id))).firstOrNull()
     }
 
@@ -69,6 +67,23 @@ class Repository(db: MongoDatabase) {
         return r.matchedCount == 1L
     }
 
+    suspend fun getLessons(): List<Lesson> {
+        return lesson.find().toList().sortedBy { it.name }
+    }
+
+    suspend fun getLesson(id: String): Lesson? {
+        return lesson.find(eq("_id", ObjectId(id))).firstOrNull()
+    }
+
+    suspend fun insertLesson(l: Lesson): Lesson? {
+        val  r = lesson.insertOne(l).insertedId ?: return null
+        return lesson.find(eq("_id", r)).firstOrNull()
+    }
+
+    suspend fun replaceLesson(l: Lesson): Boolean {
+        val r = lesson.replaceOne(eq("_id", l.id), l)
+        return r.matchedCount == 1L
+    }
 }
 
 fun getRepository(config: Config): Repository {

@@ -24,13 +24,24 @@ data class ThumbnailsTemplate(
 data class Lesson(
     @BsonId val id: ObjectId = ObjectId(),
     val name: String,
-    val formalName: String,
+    val title: String,
     val lecturerName: String,
     val termNumber: String,
-// TODO: playlists
-    val mainTemplate: ThumbnailsTemplate?,
+
+    val mainTemplateId: ObjectId?,
+    val doubleNumerationFormat: Boolean,
+
+    // TODO: playlists
+    // TODO: streamingSettings
+
+    val currentLectureNumber: Int = 1,
     //type of numeration
-)
+) {
+    fun nextLectureNumber() =
+        if (doubleNumerationFormat) "$currentLectureNumber-${currentLectureNumber + 1}" else "$currentLectureNumber"
+
+    fun titleTermNumber() = if (termNumber == "SC") "sc" else "s$termNumber"
+}
 
 data class LectureThumbnails(
     val fileName: String,
