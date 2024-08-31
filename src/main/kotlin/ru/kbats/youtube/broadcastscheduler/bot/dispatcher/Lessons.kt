@@ -22,7 +22,10 @@ fun AdminDispatcher.setupLessonsDispatcher() {
                 "[Превью](${application.filesRepository.getThumbnailsTemplatePublicUrl(it).withUpdateUrlSuffix()})\n"
             } ?: "") +
             (youtubePlaylistId?.let {
-                "[Плейлист youtube](https://www.youtube.com/playlist?list=${youtubePlaylistId})\n"
+                "[Плейлист youtube](https://www.youtube.com/playlist?list=${it})\n"
+            } ?: "") +
+            (vkPlaylistId?.let {
+                "[Плейлист vk](${application.vkApi.getAlbumUrl(it)})\n"
             } ?: "") +
             "Ключ трансляции: ${streamKey.toTitle()}\n" +
             "\nСледующая лекция: ${nextLectureNumber()}\n"
@@ -429,12 +432,12 @@ fun AdminDispatcher.setupLessonsDispatcher() {
     }
 
     callbackQuery("LessonCreatePlaylistVKCmd") {
-        val id = callbackQueryId("LessonCreatePlaylistYTCmd") ?: return@callbackQuery
+        val id = callbackQueryId("LessonCreatePlaylistVKCmd") ?: return@callbackQuery
         val lesson = requireNotNull(application.repository.getLesson(id)) { "No such lesson with id $id" }
-//        val playlistId = application.youtubeApi.createPlaylist(lesson.videoTitle(), lesson.description(), lesson.lessonPrivacy)
-//        require(application.repository.replaceLesson(lesson.copy(youtubePlaylistId = playlistId))) { "Failed to update lesson $id" }
-//        val newLesson = requireNotNull(application.repository.getLesson(id)) { "No such lesson with id $id" }
-//        callbackQuery.message?.let { bot.delete(it) }
-//        bot.sendLesson(ChatId.fromId(callbackQuery.from.id), newLesson)
+        val playlistId = application.vkApi.createAlbum(lesson.videoTitle(), lesson.lessonPrivacy)
+        require(application.repository.replaceLesson(lesson.copy(vkPlaylistId = playlistId))) { "Failed to update lesson $id" }
+        val newLesson = requireNotNull(application.repository.getLesson(id)) { "No such lesson with id $id" }
+        callbackQuery.message?.let { bot.delete(it) }
+        bot.sendLesson(ChatId.fromId(callbackQuery.from.id), newLesson)
     }
 }

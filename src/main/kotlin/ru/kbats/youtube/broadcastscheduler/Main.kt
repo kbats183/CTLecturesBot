@@ -4,15 +4,19 @@ import com.github.kotlintelegrambot.bot
 import com.github.kotlintelegrambot.dispatch
 import com.github.kotlintelegrambot.logging.LogLevel
 import ru.kbats.youtube.broadcastscheduler.bot.setupDispatcher
+import ru.kbats.youtube.broadcastscheduler.platforms.restreamer.Restreamer
+import ru.kbats.youtube.broadcastscheduler.platforms.vk.VKApi
 import ru.kbats.youtube.broadcastscheduler.states.UserStateStorage
 import ru.kbats.youtube.broadcastscheduler.youtube.YoutubeApi
 import ru.kbats.youtube.broadcastscheduler.youtube.getCredentials
 
 class Application(private val config: Config) {
     internal val youtubeApi = YoutubeApi(getCredentials(System.getenv("YT_ENV") ?: "ct_lectures")!!)
+    internal val vkApi = VKApi(config.vkConfig)
     internal val repository = getRepository(config)
     internal val filesRepository = FilesRepository(config)
     internal val userStates = UserStateStorage()
+    internal val restreamer = Restreamer(config.restreamerApiUrl)
 
     fun run() {
         val bot = bot {

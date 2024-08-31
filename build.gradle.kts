@@ -1,5 +1,3 @@
-import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
-
 plugins {
     kotlin("jvm") version "2.0.10"
     kotlin("plugin.serialization") version "2.0.0"
@@ -67,12 +65,13 @@ dependencies {
     implementation("org.mongodb:mongodb-driver-kotlin-coroutine:5.1.2")
     implementation("org.mongodb:bson-kotlinx:5.1.2")
 
-    testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.3")
-    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.10.2")
     implementation("com.google.api-client:google-api-client:1.25.0")
     implementation("com.google.apis:google-api-services-youtube:v3-rev222-1.25.0")
     implementation("com.google.http-client:google-http-client-jackson2:1.44.2")
     implementation("com.google.oauth-client:google-oauth-client-jetty:1.36.0")
 
-//    implementation("io.github.kotlin-telegram-bot.kotlin-telegram-bot:telegram:6.0.7")
+    implementation("com.vk.api:sdk:1.0.16")
+
+    testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.3")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.10.2")
 }

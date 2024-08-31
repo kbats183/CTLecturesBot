@@ -7,6 +7,8 @@ import com.github.kotlintelegrambot.entities.TelegramFile
 import com.github.kotlintelegrambot.entities.inlinequeryresults.InlineQueryResult
 import com.github.kotlintelegrambot.entities.inlinequeryresults.InputMessageContent
 import com.google.api.client.http.ByteArrayContent
+import com.google.api.services.youtube.model.LiveBroadcast
+import com.vk.api.sdk.objects.video.VideoFull
 import kotlinx.coroutines.delay
 import kotlinx.datetime.Clock
 import ru.kbats.youtube.broadcastscheduler.bot.*
@@ -15,6 +17,7 @@ import ru.kbats.youtube.broadcastscheduler.data.*
 import ru.kbats.youtube.broadcastscheduler.states.UserState
 import ru.kbats.youtube.broadcastscheduler.thumbnail.Thumbnail
 import java.io.ByteArrayOutputStream
+import kotlin.random.Random
 
 private fun defaultVideoTitle(lesson: Lesson, lessonNumber: String) =
     "${lesson.videoTitle()}, ${lesson.lectureType.toTitle()} $lessonNumber"
@@ -26,31 +29,50 @@ private fun thumbnailsLectureNumber(lesson: Lesson, video: Video) =
     }
 
 fun AdminDispatcher.setupVideosDispatcher() {
-    suspend fun Video.infoStateMessage(): String {
+    suspend fun Video.infoStateMessage(liveBroadcast: LiveBroadcast?, vkVideo: VideoFull?): String {
         val lesson = application.repository.getLesson(lessonId.toString()) ?: return ""
-        if (lesson.streamKey is StreamKey.Youtube && youtubeVideoId != null) {
-            val liveStream = application.youtubeApi.getStream(lesson.streamKey.id)!!
-            val broadcast = application.youtubeApi.getBroadcast(youtubeVideoId)!!
-            return buildString {
-                append("Youtube stream key: `${liveStream.cdn.ingestionInfo.streamName}`\n")
+        return buildString {
+            fun statusYoutube(streamKey: StreamKey.Youtube) {
+                val liveStream = application.youtubeApi.getStream(streamKey.id)!!
+
                 liveStream.status?.let { append("Youtube stream key status: ${it.streamStatus}, ${it.healthStatus.status}\n") }
-                broadcast.status?.let { append("Youtube video state: ${it.emojy()}${it.lifeCycleStatus}\n") }
+                liveBroadcast?.status?.let { append("Youtube video state: ${it.emojy()}${it.lifeCycleStatus}\n") }
+            }
+
+            if (lesson.streamKey is StreamKey.Youtube && youtubeVideoId != null) {
+                append("*Youtube*: stream key `${lesson.streamKey.key.escapeMarkdown}`\n")
+                statusYoutube(lesson.streamKey)
+            } else if (lesson.streamKey is StreamKey.Restreamer) {
+                val status = application.restreamer.getStreamKeyStatus(lesson.streamKey.name)
+                append(
+                    "*Рестример*: " + (status?.let { (if (it.isLive) "\uD83D\uDFE2" else "\uD83D\uDD34") + "  ${it.bitrate}kbps" }
+                        ?: "No key setup") +
+                            "\n  Custom server `${application.restreamer.rtmpUrl.escapeMarkdown}`\n" +
+                            "  Stream key `${lesson.streamKey.name.escapeMarkdown}`\n"
+                )
+
+                if (lesson.streamKey.youtube != null && youtubeVideoId != null) {
+                    statusYoutube(lesson.streamKey.youtube)
+                }
+//                if (vkVideo != null) {
+//                }
             }
         }
-        return ""
+
     }
 
-    suspend fun Video.infoMessage(): String {
+    suspend fun Video.infoMessage(ytVideo: LiveBroadcast?, vkVideo: VideoFull?): String {
         val streamStatus =
-            if (state == VideoState.LiveTest || state == VideoState.Live) "\n" + infoStateMessage() else ""
+            if (state == VideoState.Scheduled || state == VideoState.LiveTest || state == VideoState.Live) "\n" +
+                    infoStateMessage(ytVideo, vkVideo) else ""
 
         return "Видео *${title.escapeMarkdown}*\n" +
                 (thumbnailsLectureNumber?.let { "Номер лекции в заголовке: ${it.escapeMarkdown}\n" }
                     ?: "Номер лекции: ${lectureNumber.escapeMarkdown}\n") +
                 "Статус: ${state.toTitle()}\n\n" +
-                (youtubeVideoId?.let { "[Youtube видео](https://www.youtube.com/watch?v=${it})\n" } ?: "") +
-                (vkVideoId?.let { "[VK видео](https://www.youtube.com/watch?v=${it})\n" } ?: "") +
-                streamStatus
+                (youtubeVideoId?.let { "[Youtube видео](https://www.youtube.com/watch?v=${it}&po=${Random.Default.nextInt(1, 18)})\n" } ?: "") +
+                (vkVideo?.let { "[VK видео](${application.vkApi.getVideoLink(it)})\n" } ?: "") +
+                streamStatus + "\n${id.toString().escapeMarkdown}"
     }
 //            (mainTemplateId?.let {
 //                "[Превью](${application.filesRepository.getThumbnailsTemplatePublicUrl(it).withUpdateUrlSuffix()})\n\n"
@@ -58,11 +80,13 @@ fun AdminDispatcher.setupVideosDispatcher() {
 //            "Следующая лекция: ${nextLectureNumber()}\n"
 
     suspend fun Bot.sendVideo(chatId: ChatId, video: Video) {
+        val ytVideo = video.youtubeVideoId?.let { application.youtubeApi.getBroadcast(it) }
+        val vkVideo = video.vkVideoId?.let { application.vkApi.getVideo(it) }
         sendMessage(
             chatId,
-            video.infoMessage(),
+            video.infoMessage(ytVideo, vkVideo),
             parseMode = ParseMode.MARKDOWN_V2,
-            replyMarkup = InlineButtons.videoManage(video)
+            replyMarkup = InlineButtons.videoManage(video, ytVideo)
         ).get()
     }
 
@@ -126,13 +150,15 @@ fun AdminDispatcher.setupVideosDispatcher() {
     callbackQuery("VideoItemRefreshCmd") {
         val id = callbackQueryId("VideoItemRefreshCmd") ?: return@callbackQuery
         val video = application.repository.getVideo(id) ?: return@callbackQuery
+        val ytVideo = video.youtubeVideoId?.let { application.youtubeApi.getBroadcast(it) }
+        val vkVideo = video.vkVideoId?.let { application.vkApi.getVideo(it) }
         callbackQuery.message?.let {
             bot.editMessageText(
                 ChatId.fromId(it.chat.id),
                 it.messageId,
-                text = video.infoMessage(),
+                text = video.infoMessage(ytVideo, vkVideo),
                 parseMode = ParseMode.MARKDOWN_V2,
-                replyMarkup = InlineButtons.videoManage(video)
+                replyMarkup = InlineButtons.videoManage(video, ytVideo)
             )
         }
     }
@@ -264,10 +290,9 @@ fun AdminDispatcher.setupVideosDispatcher() {
             return@callbackQuery
         }
 
-
         val ytVideo = application.youtubeApi.createBroadcast(
             video.title,
-            lesson.descriptionFull(),
+            lesson.descriptionFull(application),
             privacy = lesson.lessonPrivacy
         )
         logger.info("Created ytVideo id ${ytVideo.id}")
@@ -292,10 +317,40 @@ fun AdminDispatcher.setupVideosDispatcher() {
             application.youtubeApi.addVideoToPlaylist(lesson.youtubePlaylistId, ytVideo.id)
         }
 
-        // create vk ....
+        var vkVideoId: Int? = null
+        var vkStreamKey: String? = null
+        if (lesson.streamKey is StreamKey.Restreamer) {
+            // create vk ....
+            logger.info("Creating vk video ${video.title}....")
+            val v = application.vkApi.createBroadcast(
+                video.title,
+                lesson.descriptionFull(application),
+                lesson.lessonPrivacy
+            )
+            vkVideoId = v.videoId
+            vkStreamKey = v.stream.url.toString() + v.stream.key
+            logger.info("Stream key for VK ${v.stream} $vkStreamKey")
+            if (lesson.vkPlaylistId != null) {
+                logger.info("Adding video to album ${video.title}....")
+                application.vkApi.addVideoToAlbum(lesson.vkPlaylistId, vkVideoId)
+            }
+            val videoFull = application.vkApi.getVideo(vkVideoId)
+            if (videoFull != null) {
+                logger.info("Video full $videoFull")
+            }
+
+            // restreamer
+            logger.info("Adding restreamer key")
+            val x = listOfNotNull(
+                lesson.streamKey.youtube?.let { "rtmp://a.rtmp.youtube.com/live2/${it.key}" },
+            )
+            application.restreamer.createStreamKey(lesson.streamKey.name, x)
+        }
 
         val newVideo = application.repository.getVideo(id)?.copy(
             youtubeVideoId = ytVideo.id,
+            vkVideoId = vkVideoId,
+            vkStreamKey = vkStreamKey,
             state = VideoState.Scheduled
         ) ?: return@callbackQuery
         require(application.repository.replaceVideo(newVideo)) { "Failed to update video" }
@@ -308,7 +363,7 @@ fun AdminDispatcher.setupVideosDispatcher() {
     callbackQuery("VideoItemStartTestingCmd") {
         val id = callbackQueryId("VideoItemStartTestingCmd") ?: return@callbackQuery
         val video = application.repository.getVideo(id) ?: return@callbackQuery
-        if (video.state != VideoState.Scheduled) return@callbackQuery
+        if (video.state != VideoState.Scheduled && video.state != VideoState.LiveTest) return@callbackQuery
         val lesson = application.repository.getLesson(video.lessonId.toString()) ?: return@callbackQuery
         val chatId = ChatId.fromId(callbackQuery.from.id)
 
@@ -321,12 +376,28 @@ fun AdminDispatcher.setupVideosDispatcher() {
             return@callbackQuery
         }
 
-        if (lesson.streamKey is StreamKey.Youtube && video.youtubeVideoId != null) {
-            application.youtubeApi.bindBroadcastStream(video.youtubeVideoId, lesson.streamKey.id)
-            if (application.youtubeApi.getBroadcast(video.youtubeVideoId)?.status?.lifeCycleStatus == "created") {
-                application.youtubeApi.transitionBroadcast(video.youtubeVideoId, "testing")
+        fun testYoutube(youtubeVideoId: String, streamKey: StreamKey.Youtube) {
+            application.youtubeApi.bindBroadcastStream(youtubeVideoId, streamKey.id)
+            val status = application.youtubeApi.getBroadcast(youtubeVideoId)?.status?.lifeCycleStatus
+            if (status == "created" || status == "ready") {
+                application.youtubeApi.transitionBroadcast(youtubeVideoId, "testing")
             }
         }
+        if (lesson.streamKey is StreamKey.Youtube && video.youtubeVideoId != null) {
+            testYoutube(video.youtubeVideoId, lesson.streamKey)
+        }
+        if (lesson.streamKey is StreamKey.Restreamer) {
+            val x = listOfNotNull(
+                lesson.streamKey.youtube?.let { "rtmp://a.rtmp.youtube.com/live2/${it.key}" },
+            )
+            application.restreamer.createStreamKey(lesson.streamKey.name, x)
+
+            if (lesson.streamKey.youtube != null && video.youtubeVideoId != null) {
+                testYoutube(video.youtubeVideoId, lesson.streamKey.youtube)
+            }
+            // also test vk here?
+        }
+
 
         val newVideo = application.repository.getVideo(id)?.copy(state = VideoState.LiveTest) ?: return@callbackQuery
         require(application.repository.replaceVideo(newVideo))
@@ -341,25 +412,42 @@ fun AdminDispatcher.setupVideosDispatcher() {
         val lesson = application.repository.getLesson(video.lessonId.toString()) ?: return@callbackQuery
         val chatId = ChatId.fromId(callbackQuery.from.id)
 
-        if (lesson.streamKey is StreamKey.Youtube && video.youtubeVideoId != null) {
-            val broadcast = application.youtubeApi.getBroadcast(video.youtubeVideoId)
-            if (broadcast?.status?.lifeCycleStatus == "ready" || broadcast?.status?.lifeCycleStatus == "testStarting") {
-                application.youtubeApi.transitionBroadcast(video.youtubeVideoId, "testing")
-                callbackQuery.message?.let { bot.delete(it) }
-                bot.sendVideo(chatId, video)
-                return@callbackQuery
-            } else if (broadcast?.status?.lifeCycleStatus != "testing" && broadcast?.status?.lifeCycleStatus != "testStarting") {
-                bot.sendMessage(
-                    chatId,
-                    "Нельзя начать youtube трансляцию, которая не находится в режиме тестирования",
-                    replyMarkup = InlineButtons.hideCallbackButton
-                )
-                return@callbackQuery
+        fun startYoutubeStream(videoId: String): Boolean {
+            val broadcastStatus = application.youtubeApi.getBroadcast(videoId)?.status?.lifeCycleStatus
+            if (broadcastStatus == "created" || broadcastStatus == "ready") {
+                logger.info("Testing youtube video ${videoId}...")
+                application.youtubeApi.transitionBroadcast(videoId, "testing")
+            } else if (broadcastStatus == "testing") {
+                logger.info("Starting youtube video ${videoId}...")
+                application.youtubeApi.transitionBroadcast(videoId, "live")
             }
-            application.youtubeApi.transitionBroadcast(video.youtubeVideoId, "live")
+
+            return broadcastStatus == "live" || broadcastStatus == "liveStarting"
         }
 
-        val newVideo = application.repository.getVideo(id)?.copy(state = VideoState.Live) ?: return@callbackQuery
+        var broadcastReady = false
+        if (lesson.streamKey is StreamKey.Youtube && video.youtubeVideoId != null) {
+            broadcastReady = startYoutubeStream(video.youtubeVideoId)
+        }
+        if (lesson.streamKey is StreamKey.Restreamer) {
+            broadcastReady = application.restreamer.getStreamKeyStatus(lesson.streamKey.name)?.isLive == true
+            if (lesson.streamKey.youtube != null) {
+                broadcastReady = broadcastReady &&
+                        video.youtubeVideoId != null && startYoutubeStream(video.youtubeVideoId)
+            }
+            if (video.vkVideoId != null && video.vkStreamKey != null) {
+                logger.info("Starting VK video ${video.vkVideoId}...")
+//                Not needed:
+//                application.vkApi.startStream(video.vkVideoId)
+                application.restreamer.addTargetToStream(lesson.streamKey.name, video.vkStreamKey)
+            }
+        }
+
+        val newVideo = if (broadcastReady) {
+            application.repository.getVideo(id)?.copy(state = VideoState.Live) ?: return@callbackQuery
+        } else {
+            video
+        }
         require(application.repository.replaceVideo(newVideo))
         callbackQuery.message?.let { bot.delete(it) }
         bot.sendVideo(chatId, newVideo)
@@ -392,11 +480,13 @@ fun AdminDispatcher.setupVideosDispatcher() {
         val lesson = application.repository.getLesson(video.lessonId.toString()) ?: return@callbackQuery
         val chatId = ChatId.fromId(callbackQuery.from.id)
 
-        if (lesson.streamKey is StreamKey.Youtube && video.youtubeVideoId != null) {
+        if (video.youtubeVideoId != null) {
             val broadcast = application.youtubeApi.getBroadcast(video.youtubeVideoId)
-            if (broadcast?.status?.lifeCycleStatus == "live") {
+            val videoStatus = broadcast?.status?.lifeCycleStatus
+            logger.info("Stopping youtube video ${video.youtubeVideoId} with status $videoStatus")
+            if (videoStatus == "live") {
                 application.youtubeApi.transitionBroadcast(video.youtubeVideoId, "complete")
-            } else if (broadcast?.status?.lifeCycleStatus != "complete") {
+            } else if (videoStatus != "complete") {
                 bot.sendMessage(
                     chatId = ChatId.fromId(callbackQuery.from.id),
                     "Не возможно завершить трансляцию на youtube",
@@ -405,11 +495,40 @@ fun AdminDispatcher.setupVideosDispatcher() {
                 return@callbackQuery
             }
         }
+        if (video.vkVideoId != null) {
+            logger.info("Stopping vk video ${video.vkVideoId}")
+            application.vkApi.stopStream(video.vkVideoId)
+        }
 
         val newVideo = application.repository.getVideo(id)?.copy(state = VideoState.Recorded) ?: return@callbackQuery
         require(application.repository.replaceVideo(newVideo))
 
         callbackQuery.message?.let { bot.delete(it) }
         bot.sendVideo(chatId, newVideo)
+    }
+
+    command("restreamer_update") {
+        val chatId = ChatId.fromId(message.chat.id)
+        if (args.size != 1) {
+            bot.sendMessage(
+                chatId,
+                "Нужен 1 аргумент: id видео, на котором нужно обновить ретример, который нужно обновить"
+            )
+            return@command
+        }
+
+        val video = application.repository.getVideo(args[0])
+        val lesson = application.repository.getLesson(video?.lessonId?.toString() ?: "")
+        if (video == null || lesson == null || lesson.streamKey !is StreamKey.Restreamer) {
+            bot.sendMessage(chatId, "Нет такого видео или предмета или не используется рестример")
+            return@command
+        }
+
+        val x = listOfNotNull(
+            lesson.streamKey.youtube?.let { "rtmp://a.rtmp.youtube.com/live2/${it.key}" },
+            video.vkStreamKey,
+        )
+        application.restreamer.createStreamKey(lesson.streamKey.name, x)
+        bot.sendMessage(chatId, "OK")
     }
 }

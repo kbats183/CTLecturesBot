@@ -300,7 +300,10 @@ object InlineButtons {
 
         return InlineKeyboardMarkup.create(
             listOfNotNull(
-                b("Добавить видео", "AddVideo").takeIf { lesson.mainTemplateId != null },
+                b(
+                    "Добавить видео (${lesson.currentLectureNumber})",
+                    "AddVideo"
+                ).takeIf { lesson.mainTemplateId != null },
                 b("Выбрать шаблон превью", "SettingsEditThumbnailsTemplate").takeIf { lesson.mainTemplateId == null },
                 InlineKeyboardButton.SwitchInlineQueryCurrentChat("Все видео", "VideosLesson${lesson.id} "),
             ), listOf(
@@ -355,7 +358,10 @@ object InlineButtons {
         )
     )
 
-    fun videoManage(video: ru.kbats.youtube.broadcastscheduler.data.Video): InlineKeyboardMarkup {
+    fun videoManage(
+        video: ru.kbats.youtube.broadcastscheduler.data.Video,
+        ytVideo: LiveBroadcast?
+    ): InlineKeyboardMarkup {
         fun b(title: String, name: String) = InlineKeyboardButton.CallbackData(title, "VideoItem${name}Cmd${video.id}")
 
         return InlineKeyboardMarkup.create(
@@ -365,16 +371,23 @@ object InlineButtons {
                     b("Обновить", "Refresh"),
                 ), listOf(
                     b("Запланировать трансляцию", "ScheduleStream"),
-                    b("Загрузить запись", "UploadRecord"),
+                    b("❌Загрузить запись❌", "UploadRecord"),
 //                b("Применить к загруженному", "UploadRecord"),
                 ).takeIf { video.state == VideoState.New }, listOfNotNull(
-                    b("Начать предпросмотр трансляции", "StartTesting").takeIf { video.state == VideoState.Scheduled },
-                    b("Начать трансляцию", "StartStreaming").takeIf { video.state == VideoState.LiveTest },
+                    b("Начать предпросмотр трансляции", "StartTesting").takeIf {
+                        video.state == VideoState.Scheduled || video.state == VideoState.LiveTest && ytVideo?.status?.lifeCycleStatus == "ready"
+                    },
+                    b("Начать трансляцию", "StartStreaming")
+                        .takeIf { video.state == VideoState.LiveTest && (ytVideo == null || ytVideo.status.lifeCycleStatus.let { it == "testing" }) },
+                    b("Обновить состояние", "StartStreaming")
+                        .takeIf { video.state == VideoState.LiveTest && (ytVideo != null && ytVideo.status.lifeCycleStatus.let { it == "liveStarting" || it == "live" }) },
                     b("Закончить трансляцию", "StopStreaming").takeIf { video.state == VideoState.Live },
                 ), listOfNotNull(
                     b("✏\uFE0F номер лекции", "EditLectureNumber").takeIf { video.customTitle == null },
                     b("\uD83D\uDEE0 специальное название", "EditCustomTitle"),
-                ).takeIf { video.state == VideoState.New }
+                ).takeIf { video.state == VideoState.New }, listOf(
+                    InlineKeyboardButton.CallbackData("Скрыть", "HideCallbackMessageCmd")
+                )
             )
         )
     }

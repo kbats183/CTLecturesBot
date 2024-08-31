@@ -1,12 +1,14 @@
 package ru.kbats.youtube.broadcastscheduler.data
 
 import com.google.api.services.youtube.model.LiveStream
+import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
 import org.bson.types.ObjectId
+import ru.kbats.youtube.broadcastscheduler.Application
 
 data class Admin(@BsonId val id: ObjectId = ObjectId(), val login: String, val comment: String)
 
@@ -42,7 +44,7 @@ data class Lesson(
 
     val lessonPrivacy: LectureBroadcastPrivacy = LectureBroadcastPrivacy.Unlisted,
     val youtubePlaylistId: String? = null,
-    val vkPlaylistId: String? = null,
+    val vkPlaylistId: Int? = null,
     val streamKey: StreamKey? = null,
 
     val currentLectureNumber: Int = 1,
@@ -73,9 +75,10 @@ data class Lesson(
                 "Лектор: $lecturerName"
     }
 
-    fun descriptionFull() = buildString {
+    fun descriptionFull(application: Application) = buildString {
         append(description())
         if (youtubePlaylistId != null) append("\nhttps://www.youtube.com/playlist?list=${youtubePlaylistId}")
+        if (vkPlaylistId != null) append("\n${application.vkApi.getAlbumUrl(vkPlaylistId)}")
     }
 }
 
@@ -94,7 +97,8 @@ sealed class StreamKey {
         @SerialName("_id")
         val id: ObjectId = ObjectId(),
         val name: String,
-        val youtube: Youtube? = null
+        val youtube: Youtube? = null,
+        val creationTime: Instant? = Clock.System.now(),
     ) : StreamKey()
 }
 
@@ -112,7 +116,8 @@ data class Video(
     val creationTime: Instant,
 
     val youtubeVideoId: String? = null,
-    val vkVideoId: String? = null,
+    val vkVideoId: Int? = null,
+    val vkStreamKey: String? = null,
 )
 
 enum class VideoState {
