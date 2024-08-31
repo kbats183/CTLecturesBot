@@ -1,13 +1,13 @@
 package ru.kbats.youtube.broadcastscheduler.youtube
 
 import com.google.api.client.auth.oauth2.Credential
-import com.google.api.client.http.FileContent
+import com.google.api.client.http.AbstractInputStreamContent
 import com.google.api.client.util.DateTime
 import com.google.api.services.youtube.YouTube
 import com.google.api.services.youtube.model.*
+import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import ru.kbats.youtube.broadcastscheduler.data.LectureBroadcastPrivacy
-import java.io.File
 import java.io.IOException
 import java.util.*
 import kotlin.time.Duration.Companion.hours
@@ -16,8 +16,9 @@ class YoutubeApi(credential: Credential) {
     private val youtube = YouTube.Builder(Auth.HTTP_TRANSPORT, Auth.JSON_FACTORY, credential)
         .setApplicationName("youtube-cmdline-createbroadcast-sample").build()
 
-    fun getStreams(): MutableList<LiveStream> {
-        return youtube.liveStreams().list("id,snippet,cdn,status").setMine(true).setMaxResults(50L).execute().items!!
+    fun getStreams(): List<LiveStream> {
+        return youtube.liveStreams().list("id,snippet,cdn,status").setMine(true).setMaxResults(50L)
+            .execute().items!!.sortedBy { it.snippet.title }
     }
 
     fun getStream(id: String): LiveStream? =
@@ -65,22 +66,24 @@ class YoutubeApi(credential: Credential) {
     /*
     Changes status of broadcast by id. From ready to testing, from testing to live, from live to complete
      */
-    fun transitionBroadcast(id: String, newStatus: String): LiveBroadcast? {
+    fun transitionBroadcast(id: String, newStatus: String): LiveBroadcast {
         return youtube.liveBroadcasts().transition(newStatus, id, "id,snippet,contentDetails,status").execute()
     }
 
     fun createBroadcast(
         title: String,
         description: String,
-        startTime: Instant,
-        endTime: Instant = startTime + 2.hours,
+        startTime: Instant? = null,
+        endTime: Instant? = null,
         privacy: LectureBroadcastPrivacy,
-    ): LiveBroadcast? {
+    ): LiveBroadcast {
         val broadcastSnippet = LiveBroadcastSnippet()
         broadcastSnippet.title = title
         broadcastSnippet.description = description
-        broadcastSnippet.scheduledStartTime = DateTime(startTime.toEpochMilliseconds())
-        broadcastSnippet.scheduledEndTime = DateTime(endTime.toEpochMilliseconds())
+        val startTimeF = startTime ?: Clock.System.now()
+        val endTimeF = endTime ?: (startTimeF + 12.hours)
+        broadcastSnippet.scheduledStartTime = DateTime(startTimeF.toEpochMilliseconds())
+        broadcastSnippet.scheduledEndTime = DateTime(endTimeF.toEpochMilliseconds())
 
         val status = LiveBroadcastStatus()
         status.privacyStatus = privacy.name.lowercase(Locale.getDefault())
@@ -93,8 +96,8 @@ class YoutubeApi(credential: Credential) {
         return youtube.liveBroadcasts().insert("snippet,status", broadcast).execute()
     }
 
-    fun uploadVideoThumbnail(videoId: String, thumbnailPngFile: File): ThumbnailSetResponse? {
-        return youtube.thumbnails().set(videoId, FileContent("image/png", thumbnailPngFile)).execute()
+    fun uploadVideoThumbnail(videoId: String, thumbnailPng: AbstractInputStreamContent): ThumbnailSetResponse? {
+        return youtube.thumbnails().set(videoId, thumbnailPng).execute()
     }
 
     fun bindBroadcastStream(broadcastId: String, streamId: String): LiveBroadcast? {
@@ -128,6 +131,15 @@ class YoutubeApi(credential: Credential) {
         return response.items.firstOrNull()
     }
 
+    fun createPlaylist(title: String, description: String, privacy: LectureBroadcastPrivacy): String {
+        val playlist = Playlist()
+        playlist.snippet = PlaylistSnippet()
+        playlist.snippet.title = title
+        playlist.snippet.description = description
+        playlist.status = PlaylistStatus()
+        playlist.status.privacyStatus = privacy.name.lowercase(Locale.US)
+        return youtube.playlists().insert("snippet,status", playlist).execute().id
+    }
 
     fun getPlaylistItems(playlistId: String? = null, videoId: String? = null): List<PlaylistItem> {
         val request = youtube.playlistItems().list("id,snippet,status,contentDetails")

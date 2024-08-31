@@ -1,5 +1,6 @@
 package ru.kbats.youtube.broadcastscheduler.bot
 
+import com.google.api.client.http.FileContent
 import com.google.api.services.youtube.model.LiveBroadcast
 import com.google.api.services.youtube.model.Video
 import ru.kbats.youtube.broadcastscheduler.Application
@@ -67,7 +68,7 @@ private fun Application.setThumbnailsAndPlaylist(lecture: Lecture, videoId: Stri
                 lecture.thumbnails,
                 lecture.currentThumbnailLecture()
             )
-            youtubeApi.uploadVideoThumbnail(videoId, generateFile)
+            youtubeApi.uploadVideoThumbnail(videoId, FileContent("image/png",  generateFile))
         } catch (e: Thumbnail.ThumbnailGenerationException) {
             println(e)
         }

@@ -11,6 +11,7 @@ import ru.kbats.youtube.broadcastscheduler.data.ThumbnailsTemplate
 import ru.kbats.youtube.broadcastscheduler.states.UserState
 import ru.kbats.youtube.broadcastscheduler.thumbnail.Thumbnail
 import ru.kbats.youtube.broadcastscheduler.withUpdateUrlSuffix
+import java.util.*
 import kotlin.random.Random
 
 fun AdminDispatcher.setupThumbnailsTemplatesDispatcher() {
@@ -137,7 +138,7 @@ fun AdminDispatcher.setupThumbnailsTemplatesDispatcher() {
             return
         }
         val newTemplate = application.repository.getThumbnailsTemplate(template.id.toString()) ?: return
-        Thumbnail.generateTemplate(
+        Thumbnail.generateThumbnail(
             newTemplate,
             newTemplate.imageId?.let { application.filesRepository.getThumbnailsImagePath(it.toString()) },
             application.filesRepository.getThumbnailsTemplatePath(template.id)
@@ -212,7 +213,7 @@ fun AdminDispatcher.setupThumbnailsTemplatesDispatcher() {
                             parseMode = ParseMode.MARKDOWN_V2
                         ).get()
                     } else {
-                        Thumbnail.generateTemplate(
+                        Thumbnail.generateThumbnail(
                             newTemplate,
                             newTemplate.imageId?.let { application.filesRepository.getThumbnailsImagePath(it.toString()) },
                             application.filesRepository.getThumbnailsTemplatePath(created.id)
@@ -331,7 +332,7 @@ fun AdminDispatcher.setupThumbnailsTemplatesDispatcher() {
                 firstTitle = firstLineWords.toString(),
                 secondTitle = secondLineWords.toString().let { it.substring(minOf(it.length, 1)) },
                 lecturerName = lesson.lecturerName,
-                termNumber = if (lesson.termNumber.toIntOrNull() != null) lesson.titleTermNumber() else "lesson",
+                termNumber = lesson.titleTermNumber().uppercase(Locale.getDefault()),
                 color = itmoColors[Random.nextInt(itmoColors.size)]
             )
             val template = application.repository.insertThumbnailsTemplate(t)
@@ -339,7 +340,7 @@ fun AdminDispatcher.setupThumbnailsTemplatesDispatcher() {
                 bot.sendMessage(chatId, "Не удалось создать шаблон для превью").get()
             } else {
                 application.repository.replaceLesson(lesson.copy(mainTemplateId = template.id))
-                Thumbnail.generateTemplate(
+                Thumbnail.generateThumbnail(
                     template,
                     template.imageId?.let { application.filesRepository.getThumbnailsImagePath(it.toString()) },
                     application.filesRepository.getThumbnailsTemplatePath(template.id)

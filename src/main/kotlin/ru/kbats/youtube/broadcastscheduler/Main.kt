@@ -15,7 +15,6 @@ class Application(private val config: Config) {
     internal val userStates = UserStateStorage()
 
     fun run() {
-        println("hi" + ("1".substring(minOf(3, 1))))
         val bot = bot {
             logLevel = LogLevel.All(networkLogLevel = LogLevel.Network.None)
             token = config.botApiToken
@@ -36,6 +35,5 @@ fun main() {
 //    println("${Clock.System.now().epochSeconds}")
 //    println("${Clock.System.now().toLocalDateTime(timeZone)}")
     val application = Application(config())
-    println("Hello!")
     application.run()
 }

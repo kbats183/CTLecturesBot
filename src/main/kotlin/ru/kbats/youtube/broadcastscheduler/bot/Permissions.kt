@@ -6,15 +6,16 @@ import com.github.kotlintelegrambot.dispatcher.handlers.*
 import com.github.kotlintelegrambot.entities.ChosenInlineResult
 import com.github.kotlintelegrambot.entities.Message
 import com.github.kotlintelegrambot.entities.Update
+import com.github.kotlintelegrambot.entities.User
 import com.github.kotlintelegrambot.extensions.filters.Filter
 import ru.kbats.youtube.broadcastscheduler.Application
+import ru.kbats.youtube.broadcastscheduler.bot.Dispatch.logger
 import java.lang.Integer.min
 
 class AdminDispatcher(val application: Application, private val dispatcher: Dispatcher) {
     fun text(text: String? = null, handleText: HandleText) {
         dispatcher.text(text) {
-            if (application.repository.getAdmins().any { it.login == message.from?.username }) {
-                println("User ${message.chat.username} send text `${message.text}`")
+            if (isAdmin(message)) {
                 handleText()
             }
         }
@@ -22,7 +23,7 @@ class AdminDispatcher(val application: Application, private val dispatcher: Disp
 
     fun photos(handlePhotos: HandlePhotos) {
         dispatcher.photos {
-            if (application.repository.getAdmins().any { it.login == message.from?.username }) {
+            if (isAdmin(message)) {
                 handlePhotos()
             }
         }
@@ -30,7 +31,7 @@ class AdminDispatcher(val application: Application, private val dispatcher: Disp
 
     fun document(handleDocument: HandleDocument) {
         dispatcher.document {
-            if (application.repository.getAdmins().any { it.login == message.from?.username }) {
+            if (isAdmin(message)) {
                 handleDocument()
             }
         }
@@ -38,11 +39,7 @@ class AdminDispatcher(val application: Application, private val dispatcher: Disp
 
     fun callbackQuery(data: String? = null, handleCallbackQuery: HandleCallbackQuery) {
         dispatcher.callbackQuery(data) {
-            if (application.repository.getAdmins().any { it.login == callbackQuery.from.username }) {
-                println(
-                    "User ${callbackQuery.from.username} send callback ${callbackQuery.data} from message " +
-                            "`${callbackQuery.message?.text?.let { it.substring(0, min(50, it.length)) }}`"
-                )
+            if (isAdmin(callbackQuery.from)) {
                 handleCallbackQuery()
             }
         }
@@ -50,7 +47,8 @@ class AdminDispatcher(val application: Application, private val dispatcher: Disp
 
     fun command(command: String, handleCommand: HandleCommand) {
         dispatcher.command(command) {
-            if (application.repository.getAdmins().any { it.login == message.from?.username }) {
+            if (isAdmin(message)) {
+                logger.info("User ${message.chat.username} send command ${message.text.logMessage()}")
                 handleCommand()
             }
         }
@@ -58,20 +56,20 @@ class AdminDispatcher(val application: Application, private val dispatcher: Disp
 
     fun inlineQuery(handleInlineQuery: HandleInlineQuery) {
         dispatcher.inlineQuery {
-            if (application.repository.getAdmins().any { it.login == inlineQuery.from.username }) {
-                println("User ${inlineQuery.from.username} send inline query ${inlineQuery.query}")
+            if (isAdmin(inlineQuery.from)) {
                 handleInlineQuery()
             }
         }
     }
 
-    fun chosenInlineResult(handleChosenInlineResultHandlerEnvironment: HandleChosenInlineResultQuery) {
-        dispatcher.addHandler(ChosenInlineResultHandler(Filter.All, handleChosenInlineResultHandlerEnvironment))
-    }
+//    fun chosenInlineResult(handleChosenInlineResultHandlerEnvironment: HandleChosenInlineResultQuery) {
+//        dispatcher.addHandler(ChosenInlineResultHandler(Filter.All, handleChosenInlineResultHandlerEnvironment))
+//    }
 
-    companion object {
-//        val logger = getLogger(AdminDispatcher::class.java)!!
-    }
+    private suspend fun isAdmin(message: Message?) = message?.chat?.type == "private" && isAdmin(message.from)
+
+    private suspend fun isAdmin(user: User?) =
+        user != null && application.repository.getAdmins().any { it.login == user.username }
 }
 
 class ChosenInlineResultHandler(
@@ -101,5 +99,26 @@ data class ChosenInlineResultHandlerEnvironment(
 typealias HandleChosenInlineResultQuery = suspend ChosenInlineResultHandlerEnvironment.() -> Unit
 
 fun Dispatcher.withAdminRight(application: Application, body: AdminDispatcher.() -> Unit) {
+    text {
+        logger.info("User ${message.chat.username} send text ${message.text.logMessage()}")
+    }
+    photos {
+        logger.info("User ${message.chat.username} send photos ${message.text.logMessage()}")
+    }
+    document {
+        logger.info("User ${message.chat.username} send document ${message.text.logMessage()}")
+    }
+    callbackQuery {
+        logger.info(
+            "User ${callbackQuery.from.username} send callback ${callbackQuery.data} from message ${callbackQuery.message?.text.logMessage()}"
+        )
+    }
+    inlineQuery {
+        logger.info("User ${inlineQuery.from.username} send inline query ${inlineQuery.query.logMessage()}")
+    }
+
     AdminDispatcher(application, this).body()
 }
+
+private fun String?.logMessage() =
+    this?.let { "`" + it.substring(0, min(50, length)).replace("\n", " ") + "`" } ?: ""

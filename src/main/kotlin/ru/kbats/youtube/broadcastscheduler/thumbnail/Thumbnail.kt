@@ -11,6 +11,7 @@ import java.awt.image.BufferedImage
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.OutputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import javax.imageio.ImageIO
@@ -36,7 +37,12 @@ object Thumbnail {
         return output.toByteArray()
     }
 
-    fun generateTemplate(template: ThumbnailsTemplate, imagePath: Path?, outputPath: Path) {
+    fun generateThumbnail(
+        template: ThumbnailsTemplate,
+        imagePath: Path?,
+        outputStream: OutputStream,
+        lectureNumber: String? = null
+    ) {
         val image = BufferedImage(1920, 1080, BufferedImage.TYPE_INT_RGB)
         val graphics = image.graphics
         val color = getColor(template.color)
@@ -69,16 +75,27 @@ object Thumbnail {
         graphics.color = Color.WHITE
         graphics.drawString(template.termNumber ?: "", 115, 992)
 
-        graphics.font = font.deriveFont(fontSize.toFloat())
-        graphics.color = color
-        graphics.drawString("L2", 439, 992)
+        lectureNumber?.let { ln ->
+            graphics.font = font.deriveFont(fontSize.toFloat())
+            graphics.color = color
+            graphics.drawString(ln, 439, 992)
+        }
 
         imagePath?.let {
             val img = ImageIO.read(imagePath.toFile())
             graphics.drawImage(img, 1290, 0, 630, 1080, null)
         }
 
-        outputPath.outputStream().use { ImageIO.write(image, "png", it) }
+        ImageIO.write(image, "png", outputStream)
+    }
+
+    fun generateThumbnail(
+        template: ThumbnailsTemplate,
+        imagePath: Path?,
+        outputPath: Path,
+        lectureNumber: String? = null
+    ) {
+        outputPath.outputStream().use { generateThumbnail(template, imagePath, it, lectureNumber) }
     }
 
     fun generate(templateDir: Path, thumbnails: LectureThumbnails, lectureTitleNumber: String): File {
@@ -151,7 +168,7 @@ fun main() {
         color = "yellow",
         imageId = ObjectId("66c31424011835161eef8b65"),
     )
-    Thumbnail.generateTemplate(
+    Thumbnail.generateThumbnail(
         template,
         application.filesRepository.getThumbnailsImagePath("66c31424011835161eef8b65"),
         Path.of("filesRepository/test.png")

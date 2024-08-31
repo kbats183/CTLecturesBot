@@ -2,6 +2,7 @@ package ru.kbats.youtube.broadcastscheduler.bot
 
 import com.github.kotlintelegrambot.dispatcher.Dispatcher
 import com.github.kotlintelegrambot.entities.ChatId
+import org.slf4j.LoggerFactory
 import ru.kbats.youtube.broadcastscheduler.Application
 import ru.kbats.youtube.broadcastscheduler.YoutubeVideoIDMatcher
 import ru.kbats.youtube.broadcastscheduler.bot.dispatcher.*
@@ -64,7 +65,12 @@ fun Application.setupDispatcher(dispatcher: Dispatcher) {
                 ChatId.fromId(message.chat.id), text = "Main menu",
                 replyMarkup = InlineButtons.mainMenu,
             )
-
+        }
+        command("menu") {
+            bot.sendMessage(
+                ChatId.fromId(message.chat.id), text = "Main menu",
+                replyMarkup = InlineButtons.mainMenu,
+            )
         }
 
         callbackQuery("HideCallbackMessageCmd") {
@@ -81,6 +87,10 @@ fun Application.setupDispatcher(dispatcher: Dispatcher) {
         setupThumbnailsImagesDispatcher()
         setupThumbnailsTemplatesDispatcher()
         setupLessonsDispatcher()
+        setupVideosDispatcher()
     }
 }
 
+object Dispatch {
+    val logger = LoggerFactory.getLogger(Dispatcher::class.java)
+}

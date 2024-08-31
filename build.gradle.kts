@@ -53,14 +53,19 @@ repositories {
 
 dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.7.1")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
     implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
 
     implementation("io.github.kotlin-telegram-bot.kotlin-telegram-bot:telegram:6.2.0")
 
+    implementation("ch.qos.logback:logback-core:1.5.7")
     implementation("ch.qos.logback:logback-classic:1.5.7")
+    implementation("org.slf4j:slf4j-api:2.0.12")
+
     implementation("org.mongodb:mongodb-driver-kotlin-coroutine:5.1.2")
+    implementation("org.mongodb:bson-kotlinx:5.1.2")
 
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.3")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.10.2")

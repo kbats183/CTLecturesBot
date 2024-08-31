@@ -36,6 +36,11 @@ sealed class UserState {
         val prevMessagesIds: List<Long>,
         val prevState: UserState
     ) : UserState()
+class ChoosingLessonStreamKey(
+        val lessonId: String,
+        val prevMessagesIds: List<Long>,
+        val prevState: UserState
+    ) : UserState()
 
     class EditingLesson(
         val id: String,
@@ -44,4 +49,11 @@ sealed class UserState {
         val prevState: UserState,
     ) : UserState()
 
+    class EditingVideo(
+        val id: String,
+        val op: String,
+        val prevMessagesIds: List<Long>,
+        val prevState: UserState,
+        val buffer: List<String> = emptyList(),
+    ) : UserState()
 }

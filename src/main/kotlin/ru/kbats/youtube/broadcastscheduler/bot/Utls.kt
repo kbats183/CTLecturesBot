@@ -13,10 +13,7 @@ import com.google.api.services.youtube.model.LiveBroadcast
 import com.google.api.services.youtube.model.LiveBroadcastStatus
 import com.google.api.services.youtube.model.LiveStream
 import com.google.api.services.youtube.model.Video
-import ru.kbats.youtube.broadcastscheduler.data.Lecture
-import ru.kbats.youtube.broadcastscheduler.data.Lesson
-import ru.kbats.youtube.broadcastscheduler.data.ThumbnailsImage
-import ru.kbats.youtube.broadcastscheduler.data.ThumbnailsTemplate
+import ru.kbats.youtube.broadcastscheduler.data.*
 import ru.kbats.youtube.broadcastscheduler.states.UserState
 import ru.kbats.youtube.broadcastscheduler.withUpdateUrlSuffix
 
@@ -64,6 +61,8 @@ internal fun LiveBroadcastStatus.emojy(): String = when (this.lifeCycleStatus) {
 } + " "
 
 object InlineButtons {
+
+
     val mainMenu = InlineKeyboardMarkup.createSingleRowKeyboard(
         InlineKeyboardButton.CallbackData("Thumbnails", "ThumbnailsTemplatesCmd"),
         InlineKeyboardButton.CallbackData("Lessons", "LessonsCmd"),
@@ -259,7 +258,7 @@ object InlineButtons {
     )
 
     fun thumbnailsTemplateManage(template: ThumbnailsTemplate, state: UserState): InlineKeyboardMarkup {
-        fun editProperty(name: String, title: String): InlineKeyboardButton.CallbackData {
+        fun editProperty(title: String, name: String): InlineKeyboardButton.CallbackData {
             return InlineKeyboardButton.CallbackData(
                 "Изменить $title",
                 "ThumbnailsTemplatesItemEdit${name}Cmd${template.id}"
@@ -272,14 +271,14 @@ object InlineButtons {
                 "ThumbnailsTemplatesItemBackCmd"
             ).takeIf { state != UserState.Default }),
             listOf(
-                editProperty("Name", "название"),
-                editProperty("Title", "заголовок"),
+                editProperty("название", "Name"),
+                editProperty("заголовок", "Title"),
             ), listOf(
-                editProperty("Lecturer", "лектора"),
-                editProperty("Term", "семестр")
+                editProperty("лектора", "Lecturer"),
+                editProperty("семестр", "Term")
             ), listOf(
-                editProperty("Color", "цвет"),
-                editProperty("Image", "картинку"),
+                editProperty("цвет", "Color"),
+                editProperty("картинку", "Image"),
             )
         )
     }
@@ -297,39 +296,49 @@ object InlineButtons {
     )
 
     fun lessonManage(lesson: Lesson): InlineKeyboardMarkup {
-        fun b(name: String, title: String) = InlineKeyboardButton.CallbackData(title, "Lesson${name}Cmd${lesson.id}")
+        fun b(title: String, name: String) = InlineKeyboardButton.CallbackData(title, "Lesson${name}Cmd${lesson.id}")
 
         return InlineKeyboardMarkup.create(
             listOfNotNull(
-                b("AddVideo", "Добавить видео").takeIf { lesson.mainTemplateId != null },
-                b("SettingsEditThumbnailsTemplate", "Выбрать шаблон превью").takeIf { lesson.mainTemplateId == null },
-                b("ListVideos", "Видео"),
+                b("Добавить видео", "AddVideo").takeIf { lesson.mainTemplateId != null },
+                b("Выбрать шаблон превью", "SettingsEditThumbnailsTemplate").takeIf { lesson.mainTemplateId == null },
+                InlineKeyboardButton.SwitchInlineQueryCurrentChat("Все видео", "VideosLesson${lesson.id} "),
             ), listOf(
-                b("ChangeNumberInc", "Номер + 1"),
-                b("ChangeNumberDec", "Номер - 1"),
+                b("Номер - 1", "ChangeNumberDec"),
+                b("Номер + 1", "ChangeNumberInc"),
+            ), listOfNotNull(
+                b("Создать плейлист Youtube", "CreatePlaylistYT").takeIf { lesson.youtubePlaylistId == null },
+                b("Создать плейлист ВК", "CreatePlaylistVK").takeIf { lesson.vkPlaylistId == null },
             ), listOf(
-                b("SettingsMenu", "Настройки"),
+                b("Настройки", "SettingsMenu"),
 //                editProperty("Delete", "Удалить"),
             )
         )
     }
 
     fun lessonSettings(lesson: Lesson): InlineKeyboardMarkup {
-        fun b(name: String, title: String) =
+        fun b(title: String, name: String) =
             InlineKeyboardButton.CallbackData(title, "LessonSettings${name}Cmd${lesson.id}")
 
         return InlineKeyboardMarkup.create(
-            listOfNotNull(
-                b("Back", "Назад")
-            ), listOf(
-                b("EditName", "Изменить название"),
-                b("EditTitle", "Изменить заголовок видео"),
-            ), listOf(
-                b("EditLecturer", "Изменить лектора"),
-                b("EditTermNumber", "Изменить номер семестра"),
-            ), listOf(
-                b("EditThumbnailsTemplate", "Изменить шаблон превью"),
-            )
+            listOf(
+                b("✏\uFE0F  название", "EditName"),
+                b("✏\uFE0F  заголовок видео", "EditTitle"),
+            ),
+            listOf(
+                b("✏\uFE0F  лектора", "EditLecturer"),
+                b("✏\uFE0F  номер семестра", "EditTermNumber"),
+            ),
+            listOf(
+                b("✏\uFE0F  шаблон превью", "EditThumbnailsTemplate"),
+            ),
+            listOf(
+                b("✏\uFE0F  тип доступа", "EditPrivacy"),
+                b("✏\uFE0F  ключ трансляции", "EditStreamKey"),
+            ),
+            listOf(
+                b("Назад", "Back")
+            ),
         )
     }
 
@@ -344,6 +353,51 @@ object InlineButtons {
                 .takeIf { lesson.mainTemplateId != null },
             InlineKeyboardButton.CallbackData("Отмена", "LessonsSettingsEditThumbnailsTemplateCancelCmd")
         )
+    )
+
+    fun videoManage(video: ru.kbats.youtube.broadcastscheduler.data.Video): InlineKeyboardMarkup {
+        fun b(title: String, name: String) = InlineKeyboardButton.CallbackData(title, "VideoItem${name}Cmd${video.id}")
+
+        return InlineKeyboardMarkup.create(
+            listOfNotNull(
+                listOfNotNull(
+                    b("Обложка видео", "ThumbnailsGen"),
+                    b("Обновить", "Refresh"),
+                ), listOf(
+                    b("Запланировать трансляцию", "ScheduleStream"),
+                    b("Загрузить запись", "UploadRecord"),
+//                b("Применить к загруженному", "UploadRecord"),
+                ).takeIf { video.state == VideoState.New }, listOfNotNull(
+                    b("Начать предпросмотр трансляции", "StartTesting").takeIf { video.state == VideoState.Scheduled },
+                    b("Начать трансляцию", "StartStreaming").takeIf { video.state == VideoState.LiveTest },
+                    b("Закончить трансляцию", "StopStreaming").takeIf { video.state == VideoState.Live },
+                ), listOfNotNull(
+                    b("✏\uFE0F номер лекции", "EditLectureNumber").takeIf { video.customTitle == null },
+                    b("\uD83D\uDEE0 специальное название", "EditCustomTitle"),
+                ).takeIf { video.state == VideoState.New }
+            )
+        )
+    }
+
+    fun lessonsEditStreamKey(lesson: Lesson) = InlineKeyboardMarkup.create(
+        listOf(
+            InlineKeyboardButton.CallbackData("Использовать рестример", "LessonsEditStreamKeyRestreamerCmd"),
+            InlineKeyboardButton.SwitchInlineQueryCurrentChat("Только youtube", "StreamKeyForLessons"),
+        ),
+        listOf(
+            InlineKeyboardButton.CallbackData("Отмена", "LessonsEditStreamKeyCancelCmd")
+        )
+    )
+
+    fun videoStopStream(video: ru.kbats.youtube.broadcastscheduler.data.Video): InlineKeyboardMarkup {
+        return InlineKeyboardMarkup.create(
+            listOf(InlineKeyboardButton.CallbackData("Завершить", "VideoItemStopStreamingConfirmCmd${video.id}")),
+            listOf(InlineKeyboardButton.CallbackData("Отмена", "VideoItemStopStreamingCancelCmd${video.id}")),
+        )
+    }
+
+    val hideCallbackButton = InlineKeyboardMarkup.createSingleRowKeyboard(
+        InlineKeyboardButton.CallbackData("Скрыть", "HideCallbackMessageCmd")
     )
 }
 
@@ -398,10 +452,36 @@ suspend fun InlineQueryHandlerEnvironment.renderInlineListItems(
             inlineQueryId = inlineQuery.id,
             inlineQueryResults = stuffResult + items.take(50 - stuffResult.size),
             nextOffset = items.getOrNull(50 - stuffResult.size)?.id ?: "end"
-        )
+        ).get()
     }
+}
+
+fun LectureType.toTitle() = when (this) {
+    LectureType.Lecture -> "лекция"
+    LectureType.Practice -> "практика"
+}
+
+fun VideoState.toTitle() = when (this) {
+    VideoState.New -> "создано"
+    VideoState.Scheduled -> "запланировано"
+    VideoState.LiveTest -> "предпросмотр"
+    VideoState.Live -> "транслируется"
+    VideoState.Recorded -> "загружена запись"
+}
+
+fun LectureBroadcastPrivacy.toTitle() = when (this) {
+    LectureBroadcastPrivacy.Public -> "публично"
+    LectureBroadcastPrivacy.Unlisted -> "по ссылке"
+}
+
+fun StreamKey?.toTitle() = when (this) {
+    is StreamKey.Youtube -> "Youtube ${name.escapeMarkdown} \\(`${key}`\\)"
+    is StreamKey.Restreamer -> "Рестример `${name.escapeMarkdown}`"
+    else -> "Не задан"
 }
 
 val thumbnailsTemplateIdRegexp = "thumbnails\\_template\\_([0-9a-f]+)".toRegex()
 val thumbnailsImageIdRegexp = "thumbnails\\_image\\_([0-9a-f]+)".toRegex()
 val lessonIdRegexp = "lesson\\_([0-9a-f]+)".toRegex()
+val videoIdRegexp = "video\\_([0-9a-f]+)".toRegex()
+val lessonStreamKeyIdRegexp = "lesson\\_stream\\_key\\_([0-9a-zA-Z\\-]+)".toRegex()

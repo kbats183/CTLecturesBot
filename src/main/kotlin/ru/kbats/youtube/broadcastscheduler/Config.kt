@@ -14,3 +14,7 @@ fun config(): Config {
         System.getenv("MONGO_BASE"),
     )
 }
+
+object Constants {
+
+}
