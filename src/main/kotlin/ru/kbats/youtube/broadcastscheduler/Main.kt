@@ -7,8 +7,8 @@ import ru.kbats.youtube.broadcastscheduler.bot.setupDispatcher
 import ru.kbats.youtube.broadcastscheduler.platforms.restreamer.Restreamer
 import ru.kbats.youtube.broadcastscheduler.platforms.vk.VKApi
 import ru.kbats.youtube.broadcastscheduler.states.UserStateStorage
-import ru.kbats.youtube.broadcastscheduler.youtube.YoutubeApi
-import ru.kbats.youtube.broadcastscheduler.youtube.getCredentials
+import ru.kbats.youtube.broadcastscheduler.platforms.youtube.YoutubeApi
+import ru.kbats.youtube.broadcastscheduler.platforms.youtube.getCredentials
 
 class Application(private val config: Config) {
     internal val youtubeApi = YoutubeApi(getCredentials(System.getenv("YT_ENV") ?: "ct_lectures")!!)

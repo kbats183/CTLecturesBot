@@ -1,4 +1,4 @@
-package ru.kbats.youtube.broadcastscheduler.youtube
+package ru.kbats.youtube.broadcastscheduler.platforms.youtube
 
 import com.google.api.client.auth.oauth2.Credential
 import com.google.api.client.http.AbstractInputStreamContent
@@ -8,6 +8,7 @@ import com.google.api.services.youtube.model.*
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import ru.kbats.youtube.broadcastscheduler.data.LectureBroadcastPrivacy
+import ru.kbats.youtube.broadcastscheduler.youtube.Auth
 import java.io.IOException
 import java.util.*
 import kotlin.time.Duration.Companion.hours

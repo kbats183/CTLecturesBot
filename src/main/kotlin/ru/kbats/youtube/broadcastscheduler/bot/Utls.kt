@@ -61,11 +61,12 @@ internal fun LiveBroadcastStatus.emojy(): String = when (this.lifeCycleStatus) {
 } + " "
 
 object InlineButtons {
-
-
     val mainMenu = InlineKeyboardMarkup.createSingleRowKeyboard(
         InlineKeyboardButton.CallbackData("Thumbnails", "ThumbnailsTemplatesCmd"),
         InlineKeyboardButton.CallbackData("Lessons", "LessonsCmd"),
+//        InlineKeyboardButton.CallbackData("Videos", "Video"),
+    )
+    val oldMainMenu = InlineKeyboardMarkup.createSingleRowKeyboard(
         InlineKeyboardButton.CallbackData("Streams", "LiveStreamsCmd"),
         InlineKeyboardButton.CallbackData("Broadcasts", "BroadcastsCmd"),
         InlineKeyboardButton.CallbackData("Lectures", "LecturesCmd"),
@@ -371,7 +372,7 @@ object InlineButtons {
                     b("Обновить", "Refresh"),
                 ), listOf(
                     b("Запланировать трансляцию", "ScheduleStream"),
-                    b("❌Загрузить запись❌", "UploadRecord"),
+//                    b("❌Загрузить запись❌", "UploadRecord"),
 //                b("Применить к загруженному", "UploadRecord"),
                 ).takeIf { video.state == VideoState.New }, listOfNotNull(
                     b("Начать предпросмотр трансляции", "StartTesting").takeIf {

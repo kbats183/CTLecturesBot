@@ -1,7 +1,7 @@
 package ru.kbats.youtube.broadcastscheduler
 
-import ru.kbats.youtube.broadcastscheduler.youtube.YoutubeApi
-import ru.kbats.youtube.broadcastscheduler.youtube.getCredentials
+import ru.kbats.youtube.broadcastscheduler.platforms.youtube.YoutubeApi
+import ru.kbats.youtube.broadcastscheduler.platforms.youtube.getCredentials
 
 fun main() {
     val youtubeApi = YoutubeApi(getCredentials(System.getenv("YT_ENV") ?: "ct_lectures")!!)

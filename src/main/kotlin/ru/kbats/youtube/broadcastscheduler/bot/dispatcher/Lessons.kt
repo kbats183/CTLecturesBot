@@ -17,7 +17,7 @@ fun AdminDispatcher.setupLessonsDispatcher() {
             "Заголовок: ${title.escapeMarkdown}\n" +
             "Лектор: ${lecturerName.escapeMarkdown}\n" +
             "Семестр: ${titleTermNumber().escapeMarkdown}\n" +
-            "Доступ: ${lessonPrivacy.toTitle().escapeMarkdown}\n\n" +
+            "Доступ: *${lessonPrivacy.toTitle().escapeMarkdown}*\n\n" +
             (mainTemplateId?.let {
                 "[Превью](${application.filesRepository.getThumbnailsTemplatePublicUrl(it).withUpdateUrlSuffix()})\n"
             } ?: "") +

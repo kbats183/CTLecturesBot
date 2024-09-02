@@ -6,7 +6,7 @@ import com.github.kotlintelegrambot.entities.ParseMode
 import com.github.kotlintelegrambot.entities.TelegramFile
 import com.github.kotlintelegrambot.entities.inlinequeryresults.InlineQueryResult
 import com.github.kotlintelegrambot.entities.inlinequeryresults.InputMessageContent
-import com.google.api.client.http.ByteArrayContent
+import com.google.api.client.http.FileContent
 import com.google.api.services.youtube.model.LiveBroadcast
 import com.vk.api.sdk.objects.video.VideoFull
 import kotlinx.coroutines.delay
@@ -17,6 +17,8 @@ import ru.kbats.youtube.broadcastscheduler.data.*
 import ru.kbats.youtube.broadcastscheduler.states.UserState
 import ru.kbats.youtube.broadcastscheduler.thumbnail.Thumbnail
 import java.io.ByteArrayOutputStream
+import java.nio.file.Path
+import kotlin.io.path.outputStream
 import kotlin.random.Random
 
 private fun defaultVideoTitle(lesson: Lesson, lessonNumber: String) =
@@ -70,8 +72,8 @@ fun AdminDispatcher.setupVideosDispatcher() {
                 (thumbnailsLectureNumber?.let { "Номер лекции в заголовке: ${it.escapeMarkdown}\n" }
                     ?: "Номер лекции: ${lectureNumber.escapeMarkdown}\n") +
                 "Статус: ${state.toTitle()}\n\n" +
-                (youtubeVideoId?.let { "[Youtube видео](https://www.youtube.com/watch?v=${it}&po=${Random.Default.nextInt(1, 18)})\n" } ?: "") +
                 (vkVideo?.let { "[VK видео](${application.vkApi.getVideoLink(it)})\n" } ?: "") +
+                (youtubeVideoId?.let { "[Youtube видео](https://www.youtube.com/watch?v=${it}&po=${Random.Default.nextInt(1, 18)})\n" } ?: "") +
                 streamStatus + "\n${id.toString().escapeMarkdown}"
     }
 //            (mainTemplateId?.let {
@@ -297,22 +299,6 @@ fun AdminDispatcher.setupVideosDispatcher() {
         )
         logger.info("Created ytVideo id ${ytVideo.id}")
 
-        val template = application.repository.getThumbnailsTemplate(video.thumbnailsTemplateId.toString())
-        if (template != null) {
-            val byteBuffer = ByteArrayOutputStream()
-            byteBuffer.use { buffer ->
-                Thumbnail.generateThumbnail(
-                    template,
-                    template.imageId?.let { application.filesRepository.getThumbnailsImagePath(it.toString()) },
-                    buffer,
-                    thumbnailsLectureNumber(lesson, video)
-                )
-            }
-            application.youtubeApi.uploadVideoThumbnail(
-                ytVideo.id,
-                ByteArrayContent("image/png", byteBuffer.toByteArray())
-            )
-        }
         if (lesson.youtubePlaylistId != null) {
             application.youtubeApi.addVideoToPlaylist(lesson.youtubePlaylistId, ytVideo.id)
         }
@@ -335,9 +321,6 @@ fun AdminDispatcher.setupVideosDispatcher() {
                 application.vkApi.addVideoToAlbum(lesson.vkPlaylistId, vkVideoId)
             }
             val videoFull = application.vkApi.getVideo(vkVideoId)
-            if (videoFull != null) {
-                logger.info("Video full $videoFull")
-            }
 
             // restreamer
             logger.info("Adding restreamer key")
@@ -347,6 +330,28 @@ fun AdminDispatcher.setupVideosDispatcher() {
             application.restreamer.createStreamKey(lesson.streamKey.name, x)
         }
 
+        val template = application.repository.getThumbnailsTemplate(video.thumbnailsTemplateId.toString())
+        if (template != null) {
+            val generatedPhoto = Path.of("generated_${template.id}.png")
+            generatedPhoto.outputStream().use { buffer ->
+                Thumbnail.generateThumbnail(
+                    template,
+                    template.imageId?.let { application.filesRepository.getThumbnailsImagePath(it.toString()) },
+                    buffer,
+                    thumbnailsLectureNumber(lesson, video)
+                )
+            }
+            application.youtubeApi.uploadVideoThumbnail(
+                ytVideo.id,
+                FileContent("image/png", generatedPhoto.toFile())
+            )
+
+            if (vkVideoId != null) {
+                application.vkApi.uploadVideoThumbnail(vkVideoId, generatedPhoto)
+            }
+        }
+
+
         val newVideo = application.repository.getVideo(id)?.copy(
             youtubeVideoId = ytVideo.id,
             vkVideoId = vkVideoId,
@@ -355,7 +360,7 @@ fun AdminDispatcher.setupVideosDispatcher() {
         ) ?: return@callbackQuery
         require(application.repository.replaceVideo(newVideo)) { "Failed to update video" }
         callbackQuery.message?.let { bot.delete(it) }
-        delay(1000)
+        delay(3000) // only for perfect youtube thumbnail
         bot.delete(creatingMessage)
         bot.sendVideo(chatId, newVideo)
     }

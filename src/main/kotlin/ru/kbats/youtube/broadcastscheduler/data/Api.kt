@@ -42,7 +42,7 @@ data class Lesson(
     // TODO: playlists
     // TODO: streamingSettings
 
-    val lessonPrivacy: LectureBroadcastPrivacy = LectureBroadcastPrivacy.Unlisted,
+    val lessonPrivacy: LectureBroadcastPrivacy = LectureBroadcastPrivacy.Public,
     val youtubePlaylistId: String? = null,
     val vkPlaylistId: Int? = null,
     val streamKey: StreamKey? = null,
@@ -54,7 +54,7 @@ data class Lesson(
 
     fun titleTermNumber() = termNumber.toIntOrNull()?.let { "s$it" } ?: termNumber
 
-    fun videoTitle(): String = "[${titleTermNumber()} | ${year}] $title"
+    fun videoTitle(): String = "[${titleTermNumber()} | ${year}] $title, $lecturerName"
 
     fun description(): String {
         val term = when (termNumber) {
@@ -78,7 +78,10 @@ data class Lesson(
     fun descriptionFull(application: Application) = buildString {
         append(description())
         if (youtubePlaylistId != null) append("\nhttps://www.youtube.com/playlist?list=${youtubePlaylistId}")
-        if (vkPlaylistId != null) append("\n${application.vkApi.getAlbumUrl(vkPlaylistId)}")
+        if (lessonPrivacy == LectureBroadcastPrivacy.Public && vkPlaylistId != null)
+            append(
+                "\n${application.vkApi.getAlbumUrl(vkPlaylistId)}"
+            )
     }
 }
 
@@ -87,7 +90,11 @@ sealed class StreamKey {
     @Serializable
     @SerialName("Youtube")
     data class Youtube(val id: String, val name: String, val key: String) : StreamKey() {
-        constructor(liveStream: LiveStream) : this(liveStream.id, liveStream.snippet.title, liveStream.cdn.ingestionInfo.streamName)
+        constructor(liveStream: LiveStream) : this(
+            liveStream.id,
+            liveStream.snippet.title,
+            liveStream.cdn.ingestionInfo.streamName
+        )
     }
 
     @Serializable

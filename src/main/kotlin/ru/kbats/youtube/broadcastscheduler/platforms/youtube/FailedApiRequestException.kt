@@ -1,4 +1,4 @@
-package ru.kbats.youtube.broadcastscheduler.youtube
+package ru.kbats.youtube.broadcastscheduler.platforms.youtube
 
 import java.io.IOException
 

@@ -66,10 +66,16 @@ fun Application.setupDispatcher(dispatcher: Dispatcher) {
                 replyMarkup = InlineButtons.mainMenu,
             )
         }
-        command("/menu") {
+        command("menu") {
             bot.sendMessage(
                 ChatId.fromId(message.chat.id), text = "Main menu",
                 replyMarkup = InlineButtons.mainMenu,
+            )
+        }
+        command("old") {
+            bot.sendMessage(
+                ChatId.fromId(message.chat.id), text = "Old main menu",
+                replyMarkup = InlineButtons.oldMainMenu,
             )
         }
 
