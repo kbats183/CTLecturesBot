@@ -11,6 +11,7 @@ import com.google.api.services.youtube.model.LiveBroadcast
 import com.vk.api.sdk.objects.video.VideoFull
 import kotlinx.coroutines.delay
 import kotlinx.datetime.Clock
+import ru.kbats.youtube.broadcastscheduler.YoutubeVideoIDMatcher
 import ru.kbats.youtube.broadcastscheduler.bot.*
 import ru.kbats.youtube.broadcastscheduler.bot.Dispatch.logger
 import ru.kbats.youtube.broadcastscheduler.data.*
@@ -73,7 +74,14 @@ fun AdminDispatcher.setupVideosDispatcher() {
                     ?: "Номер лекции: ${lectureNumber.escapeMarkdown}\n") +
                 "Статус: ${state.toTitle()}\n\n" +
                 (vkVideo?.let { "[VK видео](${application.vkApi.getVideoLink(it)})\n" } ?: "") +
-                (youtubeVideoId?.let { "[Youtube видео](https://www.youtube.com/watch?v=${it}&po=${Random.Default.nextInt(1, 18)})\n" } ?: "") +
+                (youtubeVideoId?.let {
+                    "[Youtube видео](https://www.youtube.com/watch?v=${it}&po=${
+                        Random.Default.nextInt(
+                            1,
+                            18
+                        )
+                    })\n"
+                } ?: "") +
                 streamStatus + "\n${id.toString().escapeMarkdown}"
     }
 //            (mainTemplateId?.let {
@@ -270,6 +278,86 @@ fun AdminDispatcher.setupVideosDispatcher() {
                 bot.sendVideo(chatId, newVideo)
             }
 
+            is UserState.ApplyingLessonTemplateToVideo -> {
+                val videoId = state.id
+                val video = requireNotNull(application.repository.getVideo(videoId)).copy()
+                val lesson = requireNotNull(application.repository.getLesson(video.lessonId.toString()))
+                val template =
+                    lesson.mainTemplateId?.let { application.repository.getThumbnailsTemplate(it.toString()) }
+
+                if (state.platform == "YT") {
+                    val ytVideoId = YoutubeVideoIDMatcher.match(text) ?: return@text Unit.also {
+                        val m = bot.sendMessage(
+                            chatId,
+                            text = "Некорректный id video, попробуйте еще раз или нажмите /cancel"
+                        ).get()
+                        application.userStates[message.chat.id] = UserState.ApplyingLessonTemplateToVideo(
+                            state.id,
+                            state.platform,
+                            state.prevMessagesIds + message.messageId + m.messageId,
+                            state.prevState
+                        )
+
+                    }
+                    if (application.youtubeApi.getVideo(ytVideoId) == null) {
+                        bot.sendMessage(chatId, text = "Нет видео с таким $ytVideoId")
+                        application.userStates[message.chat.id] = state.prevState
+                        return@text
+                    }
+
+                    val applyingMessage = bot.sendMessage(chatId, text = "Applying ...").get()
+
+                    application.youtubeApi.updateVideo(
+                        ytVideoId,
+                        title = video.title,
+                        description = lesson.descriptionFull(application),
+                        privacy = lesson.lessonPrivacy
+                    )
+                    if (template != null) {
+                        val generatedPhoto = generateThumbnails(template, lesson, video)
+                        application.youtubeApi.uploadVideoThumbnail(
+                            ytVideoId,
+                            FileContent("image/png", generatedPhoto.toFile())
+                        )
+                    }
+                    if (lesson.youtubePlaylistId != null) {
+                        application.youtubeApi.addVideoToPlaylist(lesson.youtubePlaylistId, ytVideoId)
+                    }
+                    application.repository.replaceVideo(video.copy(youtubeVideoId = ytVideoId))
+                    bot.delete(applyingMessage)
+                } else if (state.platform == "VK") {
+                    val vkVideoId = text.toIntOrNull()
+                    val vkVideo = vkVideoId?.let { application.vkApi.getVideo(it) }
+                    if (vkVideo == null) {
+                        bot.sendMessage(chatId, text = "Нет видео с таким id $vkVideoId")
+                        application.userStates[message.chat.id] = state.prevState
+                        return@text
+                    }
+                    val applyingMessage = bot.sendMessage(chatId, text = "Applying ...").get()
+
+                    application.vkApi.editVideo(
+                        vkVideoId,
+                        title = video.title,
+                        description = lesson.descriptionFull(application),
+                        privacy = lesson.lessonPrivacy
+                    )
+                    if (template != null) {
+                        val generatedPhoto = generateThumbnails(template, lesson, video)
+                        application.vkApi.uploadVideoThumbnail(vkVideoId, generatedPhoto)
+                    }
+                    if (lesson.vkPlaylistId != null) {
+                        application.vkApi.addVideoToAlbum(lesson.vkPlaylistId, vkVideoId)
+                    }
+                    application.repository.replaceVideo(video.copy(vkVideoId = vkVideoId))
+                    bot.delete(applyingMessage)
+                }
+                state.prevMessagesIds.forEach { bot.deleteMessage(chatId, it) }
+                bot.delete(message)
+                application.userStates[message.chat.id] = state.prevState
+                val newVideo = application.repository.getVideo(videoId)!!.copy(state = VideoState.Recorded)
+                bot.sendVideo(chatId, newVideo)
+            }
+
             else -> {}
         }
     }
@@ -332,15 +420,7 @@ fun AdminDispatcher.setupVideosDispatcher() {
 
         val template = application.repository.getThumbnailsTemplate(video.thumbnailsTemplateId.toString())
         if (template != null) {
-            val generatedPhoto = Path.of("generated_${template.id}.png")
-            generatedPhoto.outputStream().use { buffer ->
-                Thumbnail.generateThumbnail(
-                    template,
-                    template.imageId?.let { application.filesRepository.getThumbnailsImagePath(it.toString()) },
-                    buffer,
-                    thumbnailsLectureNumber(lesson, video)
-                )
-            }
+            val generatedPhoto = generateThumbnails(template, lesson, video)
             application.youtubeApi.uploadVideoThumbnail(
                 ytVideo.id,
                 FileContent("image/png", generatedPhoto.toFile())
@@ -382,6 +462,7 @@ fun AdminDispatcher.setupVideosDispatcher() {
         }
 
         fun testYoutube(youtubeVideoId: String, streamKey: StreamKey.Youtube) {
+            logger.info("Binding youtube stream to youtube video $youtubeVideoId ...")
             application.youtubeApi.bindBroadcastStream(youtubeVideoId, streamKey.id)
             val status = application.youtubeApi.getBroadcast(youtubeVideoId)?.status?.lifeCycleStatus
             if (status == "created" || status == "ready") {
@@ -482,7 +563,7 @@ fun AdminDispatcher.setupVideosDispatcher() {
         val id = callbackQueryId("VideoItemStopStreamingConfirmCmd") ?: return@callbackQuery
         val video = application.repository.getVideo(id) ?: return@callbackQuery
         if (video.state != VideoState.Live) return@callbackQuery
-        val lesson = application.repository.getLesson(video.lessonId.toString()) ?: return@callbackQuery
+        application.repository.getLesson(video.lessonId.toString()) ?: return@callbackQuery
         val chatId = ChatId.fromId(callbackQuery.from.id)
 
         if (video.youtubeVideoId != null) {
@@ -536,4 +617,53 @@ fun AdminDispatcher.setupVideosDispatcher() {
         application.restreamer.createStreamKey(lesson.streamKey.name, x)
         bot.sendMessage(chatId, "OK")
     }
+
+    callbackQuery("VideoItemApplyToYTCmd") {
+        val videoId = callbackQueryId("VideoItemApplyToYTCmd") ?: return@callbackQuery
+        requireNotNull(application.repository.getVideo(videoId))
+
+        val newMessage = bot.sendMessage(
+            ChatId.fromId(callbackQuery.from.id),
+            "Пришлите id видео на ютубе или ссылку на него, чтобы применить к нему шаблон"
+        ).get()
+        application.userStates[callbackQuery.from.id] = UserState.ApplyingLessonTemplateToVideo(
+            videoId,
+            "YT",
+            listOfNotNull(callbackQuery.message?.messageId, newMessage.messageId),
+            application.userStates[callbackQuery.from.id],
+        )
+    }
+
+    callbackQuery("VideoItemApplyToVKCmd") {
+        val videoId = callbackQueryId("VideoItemApplyToVKCmd") ?: return@callbackQuery
+        requireNotNull(application.repository.getVideo(videoId))
+
+        val newMessage = bot.sendMessage(
+            ChatId.fromId(callbackQuery.from.id),
+            "Пришлите id видео в вк (число, обозначенное за xxxx, в строке https://vk.com/video-211870343_xxxx), чтобы применить к нему шаблон. P.S. Потом научась парсить ссылки"
+        ).get()
+        application.userStates[callbackQuery.from.id] = UserState.ApplyingLessonTemplateToVideo(
+            videoId,
+            "VK",
+            listOfNotNull(callbackQuery.message?.messageId, newMessage.messageId),
+            application.userStates[callbackQuery.from.id],
+        )
+    }
+}
+
+private fun AdminDispatcher.generateThumbnails(
+    template: ThumbnailsTemplate,
+    lesson: Lesson,
+    video: Video,
+): Path {
+    val generatedPhoto = Path.of("generated_${template.id}.png")
+    generatedPhoto.outputStream().use { buffer ->
+        Thumbnail.generateThumbnail(
+            template,
+            template.imageId?.let { application.filesRepository.getThumbnailsImagePath(it.toString()) },
+            buffer,
+            thumbnailsLectureNumber(lesson, video)
+        )
+    }
+    return generatedPhoto
 }

@@ -4,11 +4,13 @@ import com.google.gson.annotations.SerializedName
 import com.vk.api.sdk.client.AbstractQueryBuilder
 import com.vk.api.sdk.client.VkApiClient
 import com.vk.api.sdk.client.actors.UserActor
+import com.vk.api.sdk.exceptions.ApiExtendedException
 import com.vk.api.sdk.httpclient.HttpTransportClient
 import com.vk.api.sdk.objects.Validable
 import com.vk.api.sdk.objects.annotations.ApiParam
 import com.vk.api.sdk.objects.annotations.Required
 import com.vk.api.sdk.objects.video.VideoFull
+import com.vk.api.sdk.objects.video.responses.EditResponse
 import com.vk.api.sdk.objects.video.responses.StartStreamingResponse
 import com.vk.api.sdk.objects.video.responses.StopStreamingResponse
 import com.vk.api.sdk.queries.video.VideoStartStreamingQuery
@@ -37,12 +39,21 @@ class VKApi(private val config: VKApiConfig) {
 
     fun addVideoToAlbum(albumId: Int, videoId: Int) {
 //        vk.video().addToAlbum(actor)
-        VideoAddToAlbumQuery(vk, actor)
-            .ownerId(-config.groupId)
-            .videoId(videoId)
-            .targetId(-config.groupId)
-            .albumId(albumId)
-            .execute()
+        try {
+            VideoAddToAlbumQuery(vk, actor)
+                .ownerId(-config.groupId)
+                .videoId(videoId)
+                .targetId(-config.groupId)
+                .albumId(albumId)
+                .execute()
+        } catch (e: ApiExtendedException) {
+            logger.warn("ApiExtendedException: ${e.code}, `${e.headers}`")
+            if (e.code == 800) {
+                logger.info("But passed")
+                return
+            }
+            throw e
+        }
     }
 
     fun createBroadcast(title: String, description: String, privacy: LectureBroadcastPrivacy): StartStreamingResponse {
@@ -111,8 +122,18 @@ class VKApi(private val config: VKApiConfig) {
         }
     }
 
+    fun editVideo(videoId: Int, title: String, description: String, privacy: LectureBroadcastPrivacy): EditResponse {
+        val r = vk.video().edit(actor)
+            .ownerId(-config.groupId)
+            .videoId(videoId)
+            .name(title)
+            .desc(description)
+            .privacyView(listOf(if (privacy == LectureBroadcastPrivacy.Public) "all" else "by_link"))
+            .execute()
+        return r
+    }
+
     companion object {
-        val vk = VkApiClient(HttpTransportClient())
         const val CLIENT_ID = 5681068
         const val REDIRECT_URI = "https://api.vk.com/blank.html"
         private val logger = getLogger(VKApi::class.java)

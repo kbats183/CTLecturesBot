@@ -7,6 +7,7 @@ import com.github.kotlintelegrambot.entities.inlinequeryresults.InlineQueryResul
 import com.github.kotlintelegrambot.entities.inlinequeryresults.InputMessageContent
 import ru.kbats.youtube.broadcastscheduler.bot.*
 import ru.kbats.youtube.broadcastscheduler.data.LectureBroadcastPrivacy
+import ru.kbats.youtube.broadcastscheduler.data.LectureType
 import ru.kbats.youtube.broadcastscheduler.data.Lesson
 import ru.kbats.youtube.broadcastscheduler.data.StreamKey
 import ru.kbats.youtube.broadcastscheduler.states.UserState
@@ -17,6 +18,7 @@ fun AdminDispatcher.setupLessonsDispatcher() {
             "Заголовок: ${title.escapeMarkdown}\n" +
             "Лектор: ${lecturerName.escapeMarkdown}\n" +
             "Семестр: ${titleTermNumber().escapeMarkdown}\n" +
+            "Тип: *${lectureType}*\n" +
             "Доступ: *${lessonPrivacy.toTitle().escapeMarkdown}*\n\n" +
             (mainTemplateId?.let {
                 "[Превью](${application.filesRepository.getThumbnailsTemplatePublicUrl(it).withUpdateUrlSuffix()})\n"
@@ -263,6 +265,9 @@ fun AdminDispatcher.setupLessonsDispatcher() {
             "Privacy" -> "Напишите тип доступа `Public` или `Unlisted` или /cancel\\.\n" +
                     "Текущий тип доступа: `${oldLesson.lessonPrivacy}`" to null
 
+            "Type" -> "Напишите тип записей `Lecture` или `Practice` или /cancel\\.\n" +
+                    "Текущий тип: `${oldLesson.lectureType}`" to null
+
             else -> return@callbackQuery
         }
 
@@ -318,6 +323,24 @@ fun AdminDispatcher.setupLessonsDispatcher() {
                             return@text
                         }
                         oldLesson.copy(lessonPrivacy = LectureBroadcastPrivacy.valueOf(text))
+                    }
+
+                    "Type" -> {
+                        if (text != "Lecture" && text != "Practice") {
+                            val m = bot.sendMessage(
+                                chatId,
+                                "Некорректный тип записей, нужно отправить один из двух типов или нажать /cancel",
+                                replyMarkup = InlineButtons.hideCallbackButton
+                            ).get()
+                            application.userStates[message.chat.id] = UserState.EditingLesson(
+                                state.id,
+                                state.op,
+                                state.prevMessagesIds + message.messageId + m.messageId,
+                                state.prevState
+                            )
+                            return@text
+                        }
+                        oldLesson.copy(lectureType = LectureType.valueOf(text))
                     }
 
                     else -> return@text
@@ -384,7 +407,7 @@ fun AdminDispatcher.setupLessonsDispatcher() {
     inlineQuery {
         renderInlineListItems("StreamKeyForLessons") {
             val x = application.youtubeApi.getStreams()
-                x.map {
+            x.map {
                 InlineQueryResult.Article(
                     id = "lesson_stream_key_${it.id}",
                     title = it.snippet.title,

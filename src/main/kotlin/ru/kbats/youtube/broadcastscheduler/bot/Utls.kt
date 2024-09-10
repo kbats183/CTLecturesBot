@@ -335,10 +335,11 @@ object InlineButtons {
             ),
             listOf(
                 b("✏\uFE0F  шаблон превью", "EditThumbnailsTemplate"),
+                b("✏\uFE0F  ключ трансляции", "EditStreamKey"),
             ),
             listOf(
                 b("✏\uFE0F  тип доступа", "EditPrivacy"),
-                b("✏\uFE0F  ключ трансляции", "EditStreamKey"),
+                b("✏\uFE0F  тип записей", "EditType"),
             ),
             listOf(
                 b("Назад", "Back")
@@ -374,14 +375,17 @@ object InlineButtons {
                     b("Запланировать трансляцию", "ScheduleStream"),
 //                    b("❌Загрузить запись❌", "UploadRecord"),
 //                b("Применить к загруженному", "UploadRecord"),
-                ).takeIf { video.state == VideoState.New }, listOfNotNull(
+                ).takeIf { video.state == VideoState.New }, listOf(
+                    b("Применить к YT видео", "ApplyToYT"),
+                    b("Применить к VK видео", "ApplyToVK"),
+                ).takeIf { video.state == VideoState.New || video.state == VideoState.Recorded }, listOfNotNull(
                     b("Начать предпросмотр трансляции", "StartTesting").takeIf {
                         video.state == VideoState.Scheduled || video.state == VideoState.LiveTest && ytVideo?.status?.lifeCycleStatus == "ready"
                     },
                     b("Начать трансляцию", "StartStreaming")
                         .takeIf { video.state == VideoState.LiveTest && (ytVideo == null || ytVideo.status.lifeCycleStatus.let { it == "testing" }) },
                     b("Обновить состояние", "StartStreaming")
-                        .takeIf { video.state == VideoState.LiveTest && (ytVideo != null && ytVideo.status.lifeCycleStatus.let { it == "liveStarting" || it == "live" }) },
+                        .takeIf { video.state == VideoState.LiveTest && (ytVideo != null && ytVideo.status.lifeCycleStatus.let { it == "liveStarting" || it == "live" || it == "complete" }) },
                     b("Закончить трансляцию", "StopStreaming").takeIf { video.state == VideoState.Live },
                 ), listOfNotNull(
                     b("✏\uFE0F номер лекции", "EditLectureNumber").takeIf { video.customTitle == null },
