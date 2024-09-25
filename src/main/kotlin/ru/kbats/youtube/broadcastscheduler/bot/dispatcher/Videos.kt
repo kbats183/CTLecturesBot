@@ -20,7 +20,6 @@ import ru.kbats.youtube.broadcastscheduler.thumbnail.Thumbnail
 import java.io.ByteArrayOutputStream
 import java.nio.file.Path
 import kotlin.io.path.outputStream
-import kotlin.random.Random
 
 private fun defaultVideoTitle(lesson: Lesson, lessonNumber: String) =
     "${lesson.videoTitle()}, ${lesson.lectureType.toTitle()} $lessonNumber"
@@ -75,12 +74,7 @@ fun AdminDispatcher.setupVideosDispatcher() {
                 "Статус: ${state.toTitle()}\n\n" +
                 (vkVideo?.let { "[VK видео](${application.vkApi.getVideoLink(it)})\n" } ?: "") +
                 (youtubeVideoId?.let {
-                    "[Youtube видео](https://www.youtube.com/watch?v=${it}&po=${
-                        Random.Default.nextInt(
-                            1,
-                            18
-                        )
-                    })\n"
+                    "[Youtube видео](https://www.youtube.com/watch?v=${it})\n"
                 } ?: "") +
                 streamStatus + "\n${id.toString().escapeMarkdown}"
     }
@@ -101,6 +95,7 @@ fun AdminDispatcher.setupVideosDispatcher() {
     }
 
     callbackQuery("LessonAddVideoCmd") {
+        callbackQuery.message?.let { bot.delete(it) }
         val chatId = ChatId.fromId(callbackQuery.from.id)
         val lessonId = callbackQueryId("LessonAddVideoCmd") ?: return@callbackQuery
         val lesson = application.repository.getLesson(lessonId) ?: return@callbackQuery
@@ -362,11 +357,23 @@ fun AdminDispatcher.setupVideosDispatcher() {
         }
     }
 
+    callbackQuery("VideoItemScheduleStreamAskCmd") {
+        val id = callbackQueryId("VideoItemScheduleStreamAskCmd") ?: return@callbackQuery
+        val video = application.repository.getVideo(id) ?: return@callbackQuery
+        if (video.state != VideoState.New) return@callbackQuery
+        bot.sendMessage(
+            ChatId.fromId(callbackQuery.from.id),
+            "Запланировать лекцию ${video.title}?",
+            replyMarkup = InlineButtons.scheduleStreamVideoAsk(video)
+        ).get()
+    }
+
     callbackQuery("VideoItemScheduleStreamCmd") {
         val id = callbackQueryId("VideoItemScheduleStreamCmd") ?: return@callbackQuery
         val video = application.repository.getVideo(id) ?: return@callbackQuery
         if (video.state != VideoState.New) return@callbackQuery
         val lesson = application.repository.getLesson(video.lessonId.toString()) ?: return@callbackQuery
+        callbackQuery.message?.let { bot.delete(it) }
         val chatId = ChatId.fromId(callbackQuery.from.id)
 
         val creatingMessage = bot.sendMessage(chatId, "Scheduling ...").get()
@@ -648,6 +655,13 @@ fun AdminDispatcher.setupVideosDispatcher() {
             listOfNotNull(callbackQuery.message?.messageId, newMessage.messageId),
             application.userStates[callbackQuery.from.id],
         )
+    }
+
+    command("video") {
+        if (args.size != 1) return@command
+        val videoId = args[0]
+        val video = requireNotNull(application.repository.getVideo(videoId)) { "No such video with id $videoId" }
+        bot.sendVideo(ChatId.fromId(message.chat.id), video)
     }
 }
 

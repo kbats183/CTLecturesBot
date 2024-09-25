@@ -463,4 +463,15 @@ fun AdminDispatcher.setupLessonsDispatcher() {
         callbackQuery.message?.let { bot.delete(it) }
         bot.sendLesson(ChatId.fromId(callbackQuery.from.id), newLesson)
     }
+
+    callbackQuery("LessonAddVideoAskCmd") {
+        val chatId = ChatId.fromId(callbackQuery.from.id)
+        val lessonId = callbackQueryId("LessonAddVideoAskCmd") ?: return@callbackQuery
+        val lesson = application.repository.getLesson(lessonId) ?: return@callbackQuery
+        bot.sendMessage(
+            chatId,
+            "Создать видео с номером ${lesson.nextLectureNumber()}?",
+            replyMarkup = InlineButtons.addVideoNewVideoAsk(lesson)
+        ).get()
+    }
 }

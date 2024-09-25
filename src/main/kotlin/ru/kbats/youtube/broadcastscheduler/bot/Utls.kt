@@ -303,7 +303,7 @@ object InlineButtons {
             listOfNotNull(
                 b(
                     "Добавить видео (${lesson.currentLectureNumber})",
-                    "AddVideo"
+                    "AddVideoAsk"
                 ).takeIf { lesson.mainTemplateId != null },
                 b("Выбрать шаблон превью", "SettingsEditThumbnailsTemplate").takeIf { lesson.mainTemplateId == null },
                 InlineKeyboardButton.SwitchInlineQueryCurrentChat("Все видео", "VideosLesson${lesson.id} "),
@@ -372,7 +372,7 @@ object InlineButtons {
                     b("Обложка видео", "ThumbnailsGen"),
                     b("Обновить", "Refresh"),
                 ), listOf(
-                    b("Запланировать трансляцию", "ScheduleStream"),
+                    b("Запланировать трансляцию", "ScheduleStreamAsk"),
 //                    b("❌Загрузить запись❌", "UploadRecord"),
 //                b("Применить к загруженному", "UploadRecord"),
                 ).takeIf { video.state == VideoState.New }, listOf(
@@ -411,6 +411,20 @@ object InlineButtons {
         return InlineKeyboardMarkup.create(
             listOf(InlineKeyboardButton.CallbackData("Завершить", "VideoItemStopStreamingConfirmCmd${video.id}")),
             listOf(InlineKeyboardButton.CallbackData("Отмена", "VideoItemStopStreamingCancelCmd${video.id}")),
+        )
+    }
+
+    fun addVideoNewVideoAsk(lesson: Lesson): InlineKeyboardMarkup {
+        return InlineKeyboardMarkup.create(
+            listOf(InlineKeyboardButton.CallbackData("Добавить", "LessonAddVideoCmd${lesson.id}")),
+            listOf(InlineKeyboardButton.CallbackData("Отмена", "HideCallbackMessageCmd")),
+        )
+    }
+
+    fun scheduleStreamVideoAsk(video: ru.kbats.youtube.broadcastscheduler.data.Video): InlineKeyboardMarkup {
+        return InlineKeyboardMarkup.create(
+            listOf(InlineKeyboardButton.CallbackData("Запланировать трансляцию", "VideoItemScheduleStreamCmd${video.id}")),
+            listOf(InlineKeyboardButton.CallbackData("Отмена", "HideCallbackMessageCmd")),
         )
     }
 
