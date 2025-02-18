@@ -3,6 +3,8 @@ package ru.kbats.youtube.broadcastscheduler.data
 import com.google.api.services.youtube.model.LiveStream
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -38,7 +40,9 @@ data class Lesson(
     val mainTemplateId: ObjectId?,
     val doubleNumerationFormat: Boolean,
     val lectureType: LectureType = LectureType.Lecture,
-    val year: String = "2024", // TODO: use connect year
+    val year: String = Clock.System.now()
+        .toLocalDateTime(TimeZone.currentSystemDefault())
+        .year.toString(), // TODO: use connect year
     // TODO: playlists
     // TODO: streamingSettings
 

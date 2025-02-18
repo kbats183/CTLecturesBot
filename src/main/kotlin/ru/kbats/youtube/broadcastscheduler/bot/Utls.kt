@@ -423,7 +423,12 @@ object InlineButtons {
 
     fun scheduleStreamVideoAsk(video: ru.kbats.youtube.broadcastscheduler.data.Video): InlineKeyboardMarkup {
         return InlineKeyboardMarkup.create(
-            listOf(InlineKeyboardButton.CallbackData("Запланировать трансляцию", "VideoItemScheduleStreamCmd${video.id}")),
+            listOf(
+                InlineKeyboardButton.CallbackData(
+                    "Запланировать трансляцию",
+                    "VideoItemScheduleStreamCmd${video.id}"
+                )
+            ),
             listOf(InlineKeyboardButton.CallbackData("Отмена", "HideCallbackMessageCmd")),
         )
     }
@@ -476,7 +481,6 @@ suspend fun InlineQueryHandlerEnvironment.renderInlineListItems(
 
         val items = itemsSupplier()
             .dropWhile { inlineQuery.offset != "" && inlineQuery.offset != it.id }
-            .take(50)
 
         val stuffResult = addItems.filter { inlineQuery.offset == "" }
 
